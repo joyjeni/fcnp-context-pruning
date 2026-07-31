@@ -96,6 +96,44 @@ budget $k$ is set by the caller; for matched-budget comparison against
 baselines we use the oracle budget $k = |R|$ where $R$ is the
 ground-truth relevant set.
 
+### 2.4 Architectural comparison: SOTA vs. FCNP
+
+![Architectural comparison: (a) SOTA per-item scoring pipeline vs. (b) FCNP global graph-flow pipeline.](../figures/fig3_architecture_comparison.png)
+
+Every prior context-compression family&mdash;lexical retrieval (BM25),
+dense top-$k$ retrieval, information-theoretic filtering (Selective
+Context), and LM-based perplexity scoring (LLMLingua /
+LongLLMLingua / LLMLingua-2), and learned summarization (RECOMP)&mdash;
+reduces architecturally to the same two stages: **(1)** an independent
+per-item scorer (a lexical statistic, an embedding similarity, a
+self-information estimate, or a small-LM perplexity), and **(2)** a
+rank-and-threshold cut. No stage represents an edge between two
+context items, so two points follow directly: redundancy between
+near-duplicate items is never penalized, and complementary items that
+are individually weak but jointly load-bearing are never rewarded.
+
+FCNP replaces both stages with a single global computation over the
+context graph $G=(V,E)$ from Section 2.1: it builds explicit
+inter-item edges, injects query current, and repeatedly solves the
+sparse Kirchhoff system $Lp=I$ until conductances converge (Section
+2.2). The retained top-$k$ set is therefore a property of the whole
+graph, not of any single item in isolation.
+
+| Aspect | SOTA (per-item) | FCNP (this work) |
+|---|---|---|
+| Scoring unit | single item, independent | joint, whole context graph |
+| Interaction modeling | none | explicit: similarity edges + injected current |
+| Core computation | lexical stats / cosine-sim / self-information / LM perplexity | sparse Laplacian solve $Lp=I$ |
+| Refinement | single pass | iterative Kirchhoff loop to convergence |
+| Redundancy handling | not explicit | implicit: near-duplicates split current |
+| Complexity | $O(n)$&ndash;$O(n\log n)$ | $O(n^2d)$ graph build + $O(\lvert E\rvert\sqrt{\kappa})$ per solve |
+| Output guarantee | heuristic top-$k$ by score | convergent sparse source&rarr;sink skeleton |
+| Representative methods | BM25, DenseTopK, Selective Context, LLMLingua/-2, LongLLMLingua, RECOMP | FCNP (graph-flow, Kirchhoff + Physarum-style reinforcement) |
+
+*Table: Qualitative architectural comparison between the SOTA
+per-item family and FCNP. Complexity and guarantee rows follow
+directly from Sections 2.1&ndash;2.3.*
+
 ## 3. Experiments
 
 ### 3.1 Dataset

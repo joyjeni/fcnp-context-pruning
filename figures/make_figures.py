@@ -1,10 +1,11 @@
 """Generate publication-quality figures for the FCNP paper.
 
 Outputs (PNG @ 300 dpi + SVG) into figures/:
-  fig1_architecture.{png,svg}      System pipeline: Kaggle -> metrics.json -> Vercel
-  fig2_algorithm_flow.{png,svg}    FCNP iteration loop (Kirchhoff)
-  fig3_novelty.{png,svg}           FCNP vs SOTA families (axes diagram)
-  fig4_context_graph.{png,svg}     Before / after pruning on the context graph
+  fig1_architecture.{png,svg}             System pipeline: Kaggle -> metrics.json -> Vercel
+  fig2_algorithm_flow.{png,svg}           FCNP iteration loop (Kirchhoff)
+  fig3_architecture_comparison.{png,svg}  SOTA (per-item) vs FCNP (graph-flow) architecture
+  fig4_novelty.{png,svg}                  FCNP vs SOTA families (axes diagram)
+  fig5_context_graph.{png,svg}            Before / after pruning on the context graph
 """
 from __future__ import annotations
 
@@ -218,7 +219,88 @@ def fig_algorithm_flow():
 
 
 # ---------------------------------------------------------------------------
-# Figure 3 : Novelty positioning (axes: granularity vs interaction modeling)
+# Figure 3 : Architecture comparison -- SOTA (per-item) vs FCNP (graph-flow)
+# ---------------------------------------------------------------------------
+def fig_architecture_comparison():
+    fig, ax = plt.subplots(figsize=(11, 6.6))
+    ax.set_xlim(0, 11)
+    ax.set_ylim(0, 6.6)
+    ax.axis("off")
+
+    def box(x, y, w, h, label, sub=None, color=C_LIGHT, edge=C_EDGE, fs=9.5, subfs=7.6):
+        patch = FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.035,rounding_size=0.10",
+                               linewidth=1.4, edgecolor=edge, facecolor=color)
+        ax.add_patch(patch)
+        ax.text(x + w/2, y + h/2 + (0.20 if sub else 0), label,
+                ha="center", va="center", fontsize=fs, fontweight="bold", color=C_EDGE)
+        if sub:
+            ax.text(x + w/2, y + h/2 - 0.22, sub, ha="center", va="center",
+                    fontsize=subfs, color=C_MUTED, style="italic")
+
+    def arrow(x1, y1, x2, y2, color=C_PRIMARY, rad=0.0):
+        style = "arc3,rad=%.2f" % rad
+        a = FancyArrowPatch((x1, y1), (x2, y2), arrowstyle="-|>", mutation_scale=13,
+                            linewidth=1.6, color=color, connectionstyle=style)
+        ax.add_patch(a)
+
+    # Divider between the two architecture rows
+    ax.plot([0.1, 10.9], [3.15, 3.15], "--", color=C_MUTED, lw=1.1, alpha=0.6)
+
+    # ---------------- Row (a): SOTA / prior-art architecture (per-item) ----
+    ax.text(0.15, 6.15, "(a) SOTA / prior-art architecture \u2014 per-item scoring",
+            ha="left", fontsize=11, fontweight="bold", color=C_EDGE)
+
+    box(0.2, 3.85, 1.85, 1.7, "Context Items", sub="$c_1,\\dots,c_n$", color="#FFF7E0")
+    box(2.45, 3.85, 2.55, 1.7, "Per-Item Scorer",
+        sub="BM25 / cosine-sim /\nself-info / LM-perplex.", color="#EAF1FB")
+    box(5.4, 3.85, 2.35, 1.7, "Rank + Top-$k$ Cut",
+        sub="independent scores,\nno cross-item edges", color="#F0E5F2")
+    box(8.15, 3.85, 2.55, 1.7, "Compressed Context", sub="heuristic threshold", color="#E6F4EA")
+
+    arrow(2.05, 4.70, 2.45, 4.70)
+    arrow(5.00, 4.70, 5.40, 4.70)
+    arrow(7.75, 4.70, 8.15, 4.70)
+
+    ax.text(3.72, 3.55, "\u2717 no inter-item interaction modeled",
+            ha="center", fontsize=8.3, color=C_ACCENT, fontweight="bold")
+
+    ax.text(0.15, 6.5, "BM25 [7] \u00b7 DenseTopK [10] \u00b7 Selective Context [5] \u00b7 "
+                       "LLMLingua / -2 [2,4] \u00b7 LongLLMLingua [3] \u00b7 RECOMP [6]",
+            ha="left", fontsize=8.0, color=C_MUTED, style="italic")
+
+    # ---------------- Row (b): FCNP architecture (graph-flow, this work) --
+    ax.text(0.15, 2.85, "(b) FCNP architecture (this work) \u2014 global graph-flow",
+            ha="left", fontsize=11, fontweight="bold", color=C_EDGE)
+
+    box(0.2, 0.35, 1.55, 1.75, "Query $q$ +\nContext $c_i$", color="#FFF7E0", fs=8.6)
+    box(1.95, 0.35, 1.65, 1.75, "Build Graph", sub="$G=(V,E)$,\n$w_{ij}\\geq\\tau$",
+        color="#EAF1FB", fs=8.6)
+    box(3.80, 0.35, 1.85, 1.75, "Inject Current\n& Solve", sub="$Lp=I$\n(sparse CG)",
+        color="#F0E5F2", fs=8.6)
+    box(5.85, 0.35, 2.05, 1.75, "Reinforce", sub="$D_{t+1}=(1{-}\\mu)D$\n$+\\alpha|Q|^{\\gamma}$",
+        color="#F0E5F2", fs=8.6)
+    box(8.10, 0.35, 1.55, 1.75, "Aggregate Flow\nTop-$k$ Select", color="#EAF1FB", fs=8.0)
+    box(9.85, 0.35, 1.0, 1.75, "Output", color="#E6F4EA", fs=8.6)
+
+    arrow(1.75, 1.225, 1.95, 1.225)
+    arrow(3.60, 1.225, 3.80, 1.225)
+    arrow(5.65, 1.225, 5.85, 1.225)
+    arrow(7.90, 1.225, 8.10, 1.225)
+    arrow(9.65, 1.225, 9.85, 1.225)
+
+    # Iterate loop-back arrow (accent) from Reinforce back to Inject/Solve
+    arrow(6.85, 0.30, 4.70, 0.30, color=C_ACCENT, rad=-0.35)
+    ax.text(5.75, 0.02, "iterate until convergence", ha="center", fontsize=8.0,
+            color=C_ACCENT, fontweight="bold")
+
+    ax.text(4.95, 2.55, "\u2713 explicit inter-item interaction via graph edges + current flow",
+            ha="center", fontsize=8.3, color=C_OK, fontweight="bold")
+
+    save(fig, "fig3_architecture_comparison")
+
+
+# ---------------------------------------------------------------------------
+# Figure 4 : Novelty positioning (axes: granularity vs interaction modeling)
 # ---------------------------------------------------------------------------
 def fig_novelty():
     fig, ax = plt.subplots(figsize=(10, 6.2))
@@ -274,11 +356,11 @@ def fig_novelty():
     ax.text(8.05, 0.95, "global flow optimization $\\rightarrow$",
             fontsize=9, color=C_ACCENT, fontweight="bold", ha="center")
 
-    save(fig, "fig3_novelty")
+    save(fig, "fig4_novelty")
 
 
 # ---------------------------------------------------------------------------
-# Figure 4 : Context graph before / after pruning
+# Figure 5 : Context graph before / after pruning
 # ---------------------------------------------------------------------------
 def fig_context_graph():
     rng = np.random.default_rng(7)
@@ -370,12 +452,13 @@ def fig_context_graph():
                      fontsize=8.5, color=C_ACCENT, fontweight="bold",
                      arrowprops=dict(arrowstyle="->", color=C_ACCENT, lw=1.2))
 
-    save(fig, "fig4_context_graph")
+    save(fig, "fig5_context_graph")
 
 
 if __name__ == "__main__":
     fig_architecture()
     fig_algorithm_flow()
+    fig_architecture_comparison()
     fig_novelty()
     fig_context_graph()
     print("done")
