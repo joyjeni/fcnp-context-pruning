@@ -201,7 +201,10 @@ def build():
         "context-compression family, with bootstrap confidence intervals and "
         "Wilcoxon significance tests (Section V). (4) A Kaggle-runnable "
         "notebook and a live Vercel dashboard that auto-populates with run "
-        "metrics for reproducibility (Section VI).", BODY))
+        "metrics for reproducibility (Section VI). (5) An explicit "
+        "architectural comparison (Fig. 3, Section III-F) contrasting the "
+        "per-item scoring pipeline shared by every prior baseline family "
+        "with FCNP's global graph-flow pipeline.", BODY))
 
     # ---- II. Related work
     story.append(Paragraph("II. Related Work", H1))
@@ -289,7 +292,7 @@ def build():
         "with &epsilon;=10<super>&minus;3</super>, or after "
         "<i>T<sub>max</sub>=200</i> iterations. We aggregate node flow "
         "<i>F<sub>i</sub>=&sum;<sub>j</sub>|Q<sub>ij</sub>|</i> and keep "
-        "the top-<i>k</i> context nodes. Figure 4 visualizes the resulting "
+        "the top-<i>k</i> context nodes. Figure 5 visualizes the resulting "
         "sparsification.", BODY))
 
     story.append(Paragraph("E. Complexity", H2))
@@ -301,7 +304,7 @@ def build():
         "gradient on the sparse Laplacian. In practice, &lt;30 iterations "
         "suffice on ToolBench-scale inputs.", BODY))
 
-    # Place Figure 1 in column 2 of page 1 (it'll flow naturally)
+    # Figure 1 and Figure 2 (banner-page columns)
     img1 = fig_image(os.path.join(FIG_DIR, "fig1_architecture.png"), COL_W)
     story.append(KeepTogether([img1, Paragraph(
         "<b>Fig. 1.</b> FCNP reproducibility pipeline. ToolBench (Qin "
@@ -323,6 +326,85 @@ def build():
 
     # ---- IV. Implementation (continue on later pages with 2 cols)
     story.append(NextPageTemplate("later"))
+
+    # ---- III.F Architectural comparison with prior work
+    story.append(Paragraph("F. Architectural comparison with prior work", H2))
+    story.append(Paragraph(
+        "Figure 3 contrasts the architecture of prior context-compression "
+        "families with FCNP. Every prior family reduces to a single "
+        "per-item scoring stage&mdash;lexical statistics (BM25 [7]), "
+        "embedding similarity (DenseTopK [10]), self-information "
+        "(Selective Context [5]), or small-LM perplexity (LLMLingua family "
+        "[2&ndash;4], RECOMP [6])&mdash;followed by an independent "
+        "rank-and-threshold cut. No stage represents an edge between two "
+        "context items, so redundancy and complementarity between items "
+        "are invisible to the objective. FCNP replaces both stages with a "
+        "single global computation: it builds an explicit inter-item "
+        "graph, injects query current, and repeatedly solves a sparse "
+        "Kirchhoff system until conductances converge, so the retained "
+        "top-<i>k</i> set is a property of the whole graph rather than of "
+        "any single item.", BODY_FIRST))
+
+    img_cmp = fig_image(os.path.join(FIG_DIR, "fig3_architecture_comparison.png"), COL_W)
+    story.append(KeepTogether([img_cmp, Paragraph(
+        "<b>Fig. 3.</b> Architectural comparison. (a) Prior "
+        "context-compression families [2&ndash;7,10] score each context "
+        "item independently and cut by rank/threshold, with no "
+        "representation of inter-item edges. (b) FCNP replaces per-item "
+        "scoring with a global graph-flow computation: an inter-item "
+        "graph is built, query current is injected and solved via a "
+        "sparse Kirchhoff system, conductances are iteratively "
+        "reinforced, and the retained set is chosen by aggregate node "
+        "flow.", CAPTION)]))
+
+    cmp_cell = ParagraphStyle("cmpcell", parent=BODY, fontSize=6.8, leading=8.1,
+                              spaceAfter=0, alignment=TA_LEFT)
+    cmp_hdr_style = ParagraphStyle("cmphdr", parent=cmp_cell, fontName="Helvetica-Bold")
+
+    def CC(text, style=cmp_cell):
+        return Paragraph(text, style)
+
+    cmp_rows = [
+        [CC("Aspect", cmp_hdr_style), CC("SOTA (per-item)", cmp_hdr_style),
+         CC("FCNP (this work)", cmp_hdr_style)],
+        [CC("Scoring"), CC("single item, independent"),
+         CC("joint, whole context graph")],
+        [CC("Interaction"), CC("none"),
+         CC("explicit: similarity edges + injected current")],
+        [CC("Computation"), CC("lexical stats / cosine-sim / self-info / LM perplexity"),
+         CC("sparse Laplacian solve <i>Lp=I</i>")],
+        [CC("Refinement"), CC("single pass"),
+         CC("iterative Kirchhoff loop to convergence")],
+        [CC("Redundancy"), CC("not explicit"),
+         CC("implicit: near-duplicates split current")],
+        [CC("Complexity"), CC("O(<i>n</i>) &ndash; O(<i>n</i>&nbsp;log&nbsp;<i>n</i>)"),
+         CC("O(<i>n</i><super>2</super><i>d</i>) build + "
+            "O(|E|&middot;&kappa;<super>1/2</super>)/iter")],
+        [CC("Guarantee"), CC("heuristic top-<i>k</i> by score"),
+         CC("convergent sparse source&rarr;sink skeleton")],
+        [CC("Methods"),
+         CC("BM25 [7], DenseTopK [10], Selective Ctx [5], "
+            "LLMLingua/-2 [2,4], LongLLMLingua [3], RECOMP [6]"),
+         CC("FCNP (graph-flow, Kirchhoff + reinforcement)")],
+    ]
+    t_cmp = Table(cmp_rows, colWidths=[0.85*inch, 1.15*inch, 1.32*inch])
+    t_cmp.setStyle(TableStyle([
+        ("FONT", (0,0), (-1,-1), "Helvetica", 6.8),
+        ("LINEBELOW", (0,0), (-1,0), 0.6, COL_TEXT),
+        ("LINEABOVE", (0,0), (-1,0), 0.6, COL_TEXT),
+        ("LINEBELOW", (0,-1), (-1,-1), 0.6, COL_TEXT),
+        ("VALIGN", (0,0), (-1,-1), "TOP"),
+        ("LEFTPADDING", (0,0), (-1,-1), 3),
+        ("RIGHTPADDING", (0,0), (-1,-1), 3),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 3),
+        ("TOPPADDING", (0,0), (-1,-1), 3),
+    ]))
+    story.append(t_cmp)
+    story.append(Paragraph(
+        "<b>Table I.</b> Qualitative architectural comparison between the "
+        "SOTA per-item family and FCNP. Complexity and guarantee rows "
+        "follow directly from Sections III-A&ndash;E.", CAPTION))
+
     story.append(Paragraph("IV. Implementation", H1))
     story.append(Paragraph(
         "FCNP is implemented in Python with <tt>numpy</tt>, "
@@ -351,7 +433,7 @@ def build():
     story.append(Paragraph("B. Baselines", H2))
     story.append(Paragraph(
         "We compare against seven baselines spanning every major family "
-        "of context compression (Fig. 3): "
+        "of context compression (Fig. 4): "
         "<b>NoCompression</b> (upper bound on recall); "
         "<b>Random</b> and <b>TopKImportance</b> (trivial floors); "
         "<b>BM25</b> [7] (lexical retrieval); "
@@ -399,7 +481,7 @@ def build():
     ]))
     story.append(t)
     story.append(Paragraph(
-        "<b>Table I.</b> Synthetic ToolBench-G1 evaluation, "
+        "<b>Table II.</b> Synthetic ToolBench-G1 evaluation, "
         "<i>n</i>=30 queries. Lexical methods (BM25), self-information "
         "(Selective Context), and learned prompt compression (LLMLingua) "
         "all saturate recall at small budgets on this split. FCNP and "
@@ -408,23 +490,23 @@ def build():
         "NoCompression on F1 (Wilcoxon <i>p</i>&lt;10<super>&minus;4</super>) "
         "and is statistically indistinguishable from DenseTopK (<i>p</i>=0.10). "
         "The unique value of FCNP is its <i>structural</i> objective "
-        "(Fig. 3), which we expect to dominate at larger context graphs "
+        "(Fig. 4), which we expect to dominate at larger context graphs "
         "with strong inter-item dependencies; this is consistent with the "
-        "novelty positioning in Fig. 3.", CAPTION))
+        "novelty positioning in Fig. 4.", CAPTION))
 
-    # Figure 3 novelty
-    img3 = fig_image(os.path.join(FIG_DIR, "fig3_novelty.png"), COL_W)
+    # Figure 4 novelty
+    img3 = fig_image(os.path.join(FIG_DIR, "fig4_novelty.png"), COL_W)
     story.append(KeepTogether([img3, Paragraph(
-        "<b>Fig. 3.</b> Positioning. All prior context-compression methods "
+        "<b>Fig. 4.</b> Positioning. All prior context-compression methods "
         "[2&ndash;7,10] score each item in isolation. FCNP is the first to "
         "perform global flow optimization on the inter-item graph.",
         CAPTION)]))
 
-    # Figure 4 context graph
-    img4 = fig_image(os.path.join(FIG_DIR, "fig4_context_graph.png"),
+    # Figure 5 context graph
+    img4 = fig_image(os.path.join(FIG_DIR, "fig5_context_graph.png"),
                      COL_W * 1.05)
     story.append(KeepTogether([img4, Paragraph(
-        "<b>Fig. 4.</b> Context graph before (a) and after (b) FCNP "
+        "<b>Fig. 5.</b> Context graph before (a) and after (b) FCNP "
         "pruning. The query <i>q</i> and answer sink <i>*</i> are bridged "
         "by a sparse high-flow subgraph; low-flow nodes (faded) are "
         "discarded.", CAPTION)]))
@@ -462,7 +544,7 @@ def build():
         "The dashboard at <font color='#1F3A5F'>"
         "fcnp-dashboard.vercel.app</font> accepts authenticated POSTs to "
         "<tt>/api/metrics</tt> so any third party can re-run the "
-        "benchmark and update the public results. All numbers in Table I "
+        "benchmark and update the public results. All numbers in Table II "
         "are reproducible from the supplied "
         "<tt>run_synthetic_e2e.py</tt> script.", BODY))
 
