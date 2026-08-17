@@ -1,4 +1,7 @@
 gradio==4.44.0
+spaces
+starlette<1.0
+fastapi<0.116
 sentence-transformers==3.0.1
 rank-bm25==0.2.2
 plotly==5.24.1

@@ -19,6 +19,7 @@ import time
 import gradio as gr
 import numpy as np
 import plotly.graph_objects as go
+import spaces
 
 from fcnp.pruner import FlowBasedNetworkPruner, FCNPConfig
 from fcnp.types import ContextElement
@@ -70,6 +71,7 @@ def _dense_rank(query_vec: np.ndarray, doc_vecs: np.ndarray) -> list[int]:
     return list(np.argsort(-sims))
 
 
+@spaces.GPU
 def run_comparison(query: str, candidates_raw: str, keep_fraction: float):
     parsed = _parse_candidates(candidates_raw)
     if not query.strip() or len(parsed) < 2:
