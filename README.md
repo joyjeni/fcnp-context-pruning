@@ -60,12 +60,17 @@ vercel deploy --prod
 
 ### 3. Hugging Face Space (interactive demo)
 
+**Live**: [huggingface.co/spaces/abigailcreations/compression](https://huggingface.co/spaces/abigailcreations/compression)
+
 `hf_space/` contains a self-contained Gradio app (`app.py`) that lets anyone paste a query + candidate list and see FCNP vs BM25 vs DenseTopK vs Random pick different (or the same) subset live, using the real `fcnp` package from this repo.
 
-To publish it:
+To publish your own copy:
 1. Create a new Space at [huggingface.co/new-space](https://huggingface.co/new-space) (SDK: Gradio).
-2. `cd hf_space && git init && git add . && git commit -m "init"`
-3. `git remote add space https://huggingface.co/spaces/<your-username>/<space-name>` then `git push space main` (or `master`, matching your Space's default branch).
+2. As of mid-2026, free personal accounts can no longer run Gradio/Docker Spaces on `cpu-basic` (that now requires a PRO plan) — pick **ZeroGPU** hardware instead, which stays free for up to 2 Spaces per personal account. If you use ZeroGPU, the app must import `spaces` and decorate its main compute function with `@spaces.GPU` (already done in `app.py`), or the Space fails at startup with "No `@spaces.GPU` function detected".
+3. `cd hf_space && git init && git add . && git commit -m "init"`
+4. `git remote add space https://huggingface.co/spaces/<your-username>/<space-name>` then `git push space main` (or `master`, matching your Space's default branch).
+
+> **Note**: `requirements.txt` pins `starlette<1.0` and `fastapi<0.116` — newer Starlette changed the `TemplateResponse` signature in a way that's incompatible with `gradio==4.44.0`'s internal startup self-check, causing `TypeError: unhashable type: 'dict'`. Keep these pins unless you upgrade gradio too.
 
 ---
 
