@@ -20,19 +20,52 @@ FCNP (**Flow-Coupled Network Pruning**) is a context compression algorithm for L
 
 FCNP models the context window as a conductance network: each chunk of retrieved context is a node; query-chunk relevance defines conductance; Kirchhoff flow equations determine which chunks are "on the critical path" to answering the query. Low-flow chunks are pruned.
 
-**Novel Contribution**: FCNP is the **first global flow-coupled context compression method for LLMs** — prior work (SelectiveContext, LLMLingua) performs per-item ranking independently of other items. FCNP's Kirchhoff formulation makes pruning decisions jointly, preserving globally coherent context rather than locally top-ranked fragments.
+**Contribution**: FCNP is a **novel application of Physarum/Kirchhoff flow-network dynamics** ([Tero et al. 2010](https://www.science.org/doi/10.1126/science.1177894); [Bonifaci et al. 2012](https://doi.org/10.1016/j.jtbi.2011.10.021)) to LLM context compression — prior compression work (SelectiveContext, LLMLingua) ranks items independently, while FCNP's Kirchhoff formulation makes pruning decisions jointly across the graph. This is a novel *application* of an existing algorithm family, not a novel algorithm; see the Results section below for where the joint formulation currently does and does not pay off empirically.
 
 ---
 
-## Deployment
+## Productionization: Kaggle → Vercel → Hugging Face
 
 **GitHub Repository**: https://github.com/joyjeni/fcnp-context-pruning
 
-**Vercel Dashboard**: deployed from the `dashboard/` directory of the repository. Provides live compression visualisation — shows the conductance graph, flow values, and which chunks are pruned vs retained.
+The pipeline has three parts that hand off to each other:
 
-### Kaggle Notebook
+```
+Kaggle notebook  --(POST /api/metrics)-->  Vercel dashboard  <--(reads same fcnp package)--  Hugging Face Space
+(runs benchmark)      live charts/tables       (public URL)                                (interactive demo)
+```
 
-`fcnp_toolbench_benchmark.ipynb` — full reproducible benchmark against 7 baselines on the ToolBench-Agri dataset.
+### 1. Kaggle notebook (runs the benchmark)
+
+`notebooks/fcnp_toolbench_benchmark.ipynb` (generated from `notebooks/build_notebook.py`) loads the **real HuggingFace ToolBench dataset** (`tuandunghcmut/toolbench-v1`, all six G1/G2/G3 splits, 200 examples/split), runs FCNP + all 7 baselines, computes Wilcoxon significance, and **POSTs the results live to the dashboard**.
+
+To run it:
+1. Upload `notebooks/fcnp_toolbench_benchmark.ipynb` to your own Kaggle account (`kaggle kernels push -p notebooks/` also works once you edit the placeholder `id` field in `notebooks/kernel-metadata.json` to your Kaggle username), enable GPU + internet in notebook settings.
+2. Add two Kaggle secrets: `DASHBOARD_URL` (your deployed dashboard URL, e.g. `https://fcnp-dashboard.vercel.app`) and `DASHBOARD_TOKEN` (a bearer token you choose — set the same value as the `DASHBOARD_TOKEN` env var on Vercel, see below).
+3. Run all cells. The final cell POSTs `{methods: [...], dataset, n_examples, ...}` to `{DASHBOARD_URL}/api/metrics` with `Authorization: Bearer {DASHBOARD_TOKEN}` — the dashboard updates live, no redeploy needed.
+
+### 2. Vercel dashboard (live charts/tables)
+
+`dashboard/` is a Next.js app. `app/api/metrics/route.ts` accepts the Kaggle POST and serves it back out; `lib/store.ts` persists it in Vercel KV if configured, else falls back to an in-memory store seeded from `public/metrics.json`.
+
+To deploy your own copy:
+```bash
+cd dashboard
+npm install
+vercel link          # link to a Vercel project you have deploy rights on
+vercel env add DASHBOARD_TOKEN production   # same value you used as the Kaggle secret
+vercel deploy --prod
+```
+> **Note**: deployment must be run from an account/team with Production Deployment permission on the target Vercel project — a team role restricted to "Member" without deploy rights will fail with *"You don't have permission to create a Production Deployment for this project"* even on a brand-new project. Check **Team Settings → Members → role** if you hit this.
+
+### 3. Hugging Face Space (interactive demo)
+
+`hf_space/` contains a self-contained Gradio app (`app.py`) that lets anyone paste a query + candidate list and see FCNP vs BM25 vs DenseTopK vs Random pick different (or the same) subset live, using the real `fcnp` package from this repo.
+
+To publish it:
+1. Create a new Space at [huggingface.co/new-space](https://huggingface.co/new-space) (SDK: Gradio).
+2. `cd hf_space && git init && git add . && git commit -m "init"`
+3. `git remote add space https://huggingface.co/spaces/<your-username>/<space-name>` then `git push space main` (or `master`, matching your Space's default branch).
 
 ---
 
@@ -76,17 +109,26 @@ In practice, convergence is reached in 8–15 iterations for typical mandi price
 
 ## Results
 
-### Benchmark: ToolBench-Agri (Agricultural API responses)
+### Benchmark: ToolBench (synthetic G1, n=30) — proof-of-concept scale
 
-| Metric               | Value          | Notes                                          |
-|----------------------|----------------|------------------------------------------------|
-| Compression Ratio    | **10:1**       | 50+ records → ~5 retained chunks              |
-| F1@K                 | **Best**       | Outperforms all 7 baselines (Wilcoxon p<0.05) |
-| Citation Accuracy    | **≥99%**       | Retained chunks preserve source attribution   |
+Honest numbers, straight from [`results/summary.md`](results/summary.md) / [`results/results.csv`](results/results.csv) (also live on the [Vercel dashboard](https://fcnp-dashboard.vercel.app)):
 
-**Statistical test**: Wilcoxon signed-rank, p < 0.05 across all 7 baseline comparisons.
+| Method | F1 (mean, 95% CI) | Compression × | Latency p50 |
+|---|---|---:|---:|
+| BM25 | 1.000 [1.000, 1.000] | 6.16× | 0.52 ms |
+| SelectiveContext | 1.000 [1.000, 1.000] | 6.16× | 0.48 ms |
+| LLMLingua | 1.000 [1.000, 1.000] | 6.16× | 0.37 ms |
+| DenseTopK | 0.493 [0.400, 0.587] | 9.97× | 0.18 ms |
+| **FCNP** | **0.473 [0.387, 0.560]** | 10.12× | 19.41 ms |
+| NoCompression | 0.118 [0.118, 0.118] | 1.00× | 0.00 ms |
+| TopKImportance | 0.067 [0.033, 0.107] | 16.33× | 0.02 ms |
+| Random | 0.053 [0.027, 0.087] | 16.59× | 0.03 ms |
 
-### Baselines Defeated
+**FCNP does not currently beat DenseTopK on this benchmark** — DenseTopK is numerically higher on F1 and ~100× faster; the Wilcoxon test vs DenseTopK is *not* significant (p=0.102). FCNP does significantly outperform NoCompression/Random/TopKImportance, and BM25/SelectiveContext/LLMLingua hit a perfect F1=1.000 because this 30-example synthetic set embeds the ground-truth keyword literally in each relevant API's name, making it trivially recoverable by lexical match — that is a property of this small proof-of-concept set, not evidence those methods are undominatable in general.
+
+**What this means:** the `n=30` synthetic set was a quick proof-of-concept for wiring the pipeline end-to-end, not a publication-scale claim. The Kaggle notebook (`notebooks/fcnp_toolbench_benchmark.ipynb`) now runs the *real* HuggingFace ToolBench dataset across all six G1/G2/G3 splits (up to 1,200 examples) — run it and POST the results to the dashboard (see **Productionization** below) before citing any F1 numbers in a paper or claiming FCNP beats the baselines.
+
+### Baselines compared
 
 | # | Baseline                                            | Reference                    |
 |---|-----------------------------------------------------|------------------------------|
@@ -97,8 +139,6 @@ In practice, convergence is reached in 8–15 iterations for typical mandi price
 | 5 | DenseTopK                                           | —                            |
 | 6 | SelectiveContext                                    | Li et al., EMNLP 2023        |
 | 7 | LLMLingua                                           | Jiang et al., EMNLP 2023     |
-
-FCNP produces higher F1@K than all seven baselines while maintaining ≥99% citation accuracy (the retained chunks always include the correct source record).
 
 ---
 

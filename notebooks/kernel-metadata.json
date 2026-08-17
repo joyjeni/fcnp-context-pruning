@@ -1,0 +1,13 @@
+{
+  "id": "YOUR_KAGGLE_USERNAME/fcnp-toolbench-benchmark",
+  "title": "FCNP on ToolBench - Publication Benchmark",
+  "code_file": "fcnp_toolbench_benchmark.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "kernel_sources": [],
+  "competition_sources": []
+}
