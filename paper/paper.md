@@ -277,3 +277,46 @@ inspiration for extensions #1–#3 and #5. As of this writing it is an
 arXiv preprint with no confirmed peer-reviewed acceptance, and is
 deliberately **not** included in this reference list or relied upon
 as a citable source in this manuscript.
+
+### Additional journal-tier references (defense/positioning support)
+
+These supplement the conference-heavy list above with genuine
+peer-reviewed **journal** articles, each verified directly against
+the live page; see `docs/NOVELTY_DEFENSE.md` §9a for verification
+notes and per-item verdicts.
+
+- Gharehchopogh, F. S. et al. *Slime Mould Algorithm: A Comprehensive
+  Survey of Its Variants and Applications.* Archives of Computational
+  Methods in Engineering 30, 2683–2723, 2023. DOI:
+  10.1007/s11831-023-09883-3.
+- "Advances in Slime Mould Algorithm: A Comprehensive Survey."
+  Biomimetics 9(1), 31, 2024. DOI: 10.3390/biomimetics9010031.
+- "An Improved Physarum polycephalum Algorithm for the Shortest Path
+  Problem." The Scientific World Journal, 2014. DOI:
+  10.1155/2014/487069.
+- "Effective resistance is more than distance: Laplacians, Simplices
+  and the Schur complement." Linear Algebra and its Applications,
+  2022. DOI: 10.1016/j.laa.2022.01.002.
+- "Recursion-Transform method to a non-regular m×n cobweb with an
+  arbitrary longitude." Scientific Reports 5, 11266, 2015. DOI:
+  10.1038/srep11266.
+- "Comparison of methods to determine point-to-point resistance in
+  nearly rectangular networks with application to a 'hammock'
+  network." Royal Society Open Science, 2015. DOI:
+  10.1098/rsos.140420.
+- Pires, S., Ziviani, A., Sampaio, L. N. *Contextual dimensions for
+  cache replacement schemes in information-centric networks: a
+  systematic review.* PeerJ Computer Science, 2021. DOI:
+  10.7717/peerj-cs.418.
+- Klang, E. et al. *A strategy for cost-effective large language
+  model use at health system-scale.* npj Digital Medicine 7, 320,
+  2024. DOI: 10.1038/s41746-024-01315-1.
+- Ibrahim, A., Senthilkumar, K., Saito, K. *Evaluating responses by
+  ChatGPT to farmers' questions on irrigated lowland rice cultivation
+  in Nigeria.* Scientific Reports 14, 2024. DOI:
+  10.1038/s41598-024-53916-1.
+- "Large language models can help boost food production, but be
+  mindful of their risks." Frontiers in Artificial Intelligence,
+  2024. DOI: 10.3389/frai.2024.1326153.
+- "A Systematic Review of IoT Solutions for Smart Farming." Sensors
+  20(15), 4231, 2020. DOI: 10.3390/s20154231.

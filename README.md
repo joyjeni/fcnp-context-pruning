@@ -378,7 +378,7 @@ pruned = pruner.compress(context_chunks, query="What is today's tomato price?")
 
 ### PhD defense literature grounding
 
-For the base-paper positioning and a per-contribution novelty verdict (what is prior art vs. what is a novel combination vs. what is genuinely unclaimed), with every citation checked against a live, verifiable source, see **[`docs/NOVELTY_DEFENSE.md`](docs/NOVELTY_DEFENSE.md)**.
+For the base-paper positioning and a per-contribution novelty verdict (what is prior art vs. what is a novel combination vs. what is genuinely unclaimed), with every citation checked against a live, verifiable source, see **[`docs/NOVELTY_DEFENSE.md`](docs/NOVELTY_DEFENSE.md)**. Section 9a there lists additional peer-reviewed **journal** papers (Archives of Computational Methods in Engineering, npj Digital Medicine, Scientific Reports, Royal Society Open Science, PeerJ Computer Science, Biomimetics, Frontiers in AI, Sensors) beyond the conference-heavy list above.
 
 ---
 

@@ -120,6 +120,52 @@ This preprint benchmarks $/token cost between SLMs and proprietary APIs — a re
 - **Fixed:** the Bonifaci et al. 2012 DOI was previously mis-cited in `README.md` as `10.1016/j.jtbi.2011.10.021` — that DOI belongs to an unrelated paper ("Prediction of protein-protein interaction sites using patch-based residue characterization," *J. Theor. Biol.* 2012, 293:143-50). Corrected to the real DOI: `10.1016/j.jtbi.2012.06.017`.
 - **Flagged, not removed:** `arXiv:2601.07190` ("Active Context Compression: Autonomous Memory Management in LLM Agents") is confirmed to genuinely exist (submitted 12 Jan 2026, author Nikhil Verma) but is **preprint-only as of Aug 2026, with no peer-reviewed acceptance found**. It is retained in `README.md` only as *motivating inspiration* for the five extensions, with an explicit preprint caveat added — do not present it as a peer-reviewed source in the defense.
 
+## 9a. Additional verified peer-reviewed JOURNAL papers (not conference/arXiv), by topic
+
+The citations above lean heavily on top-tier **conferences** (EMNLP, ACL, ICML, HotOS) because that is where most LLM-compression work is published. The list below adds genuine peer-reviewed **journal** articles — each independently confirmed by fetching the live page and reading its journal name, volume, and DOI off the page itself, not assumed from a search snippet.
+
+**Core mechanism — Physarum/network-flow algorithms:**
+
+| Paper | Journal (real, verified) | Link |
+|---|---|---|
+| Gharehchopogh, F.S. et al. "Slime Mould Algorithm: A Comprehensive Survey of Its Variants and Applications." | **Archives of Computational Methods in Engineering**, vol. 30, pp. 2683–2723 (2023) — Springer, high-impact review journal | https://pmc.ncbi.nlm.nih.gov/articles/PMC9838547/ |
+| "Advances in Slime Mould Algorithm: A Comprehensive Survey." | **Biomimetics**, vol. 9, no. 1, 31 (2024) — MDPI, mid-tier open access | https://www.mdpi.com/2313-7673/9/1/31 |
+| "An Improved Physarum polycephalum Algorithm for the Shortest Path Problem." | **The Scientific World Journal** (2014), Hindawi/PMC-indexed — mid-tier, note Hindawi's editorial reputation has been debated in recent years, cite cautiously | https://pmc.ncbi.nlm.nih.gov/articles/PMC3984829/ |
+
+These are review/survey papers, useful for a defense to show the Physarum-algorithm-family is an active, still-growing peer-reviewed research area beyond the original 2010/2012 papers — not to replace Tero 2010 / Bonifaci 2012 as the primary mechanism citation.
+
+**Foundational math — Laplacian / resistor-network theory underlying FCNP's Kirchhoff formulation:**
+
+| Paper | Journal | Link |
+|---|---|---|
+| "Effective resistance is more than distance: Laplacians, Simplices and the Schur complement." | **Linear Algebra and its Applications** (2022), Elsevier | https://arxiv.org/pdf/2010.04521.pdf (journal DOI 10.1016/j.laa.2022.01.002) |
+| "Recursion-Transform method to a non-regular m×n cobweb with an arbitrary longitude." | **Scientific Reports**, vol. 5, 11266 (2015), Nature Portfolio | https://pmc.ncbi.nlm.nih.gov/articles/PMC4466885/ |
+| "Comparison of methods to determine point-to-point resistance in nearly rectangular networks with application to a 'hammock' network." | **Royal Society Open Science** (2015) | https://pmc.ncbi.nlm.nih.gov/articles/PMC4448860/ |
+
+**Extension #3 (persistent memory / promotion-demotion) — additional journal-tier caching literature:**
+
+| Paper | Journal | Link |
+|---|---|---|
+| Pires, S., Ziviani, A., Sampaio, L.N. "Contextual dimensions for cache replacement schemes in information-centric networks: a systematic review." | **PeerJ Computer Science** (2021) | https://peerj.com/articles/cs-418 |
+
+**Extension #4 (compute-cost vs. token-cost) — revised finding: a genuine peer-reviewed journal match exists, though not an exact framing match:**
+
+| Paper | Journal | Link |
+|---|---|---|
+| Klang, E. et al. "A strategy for cost-effective large language model use at health system-scale." | **npj Digital Medicine**, vol. 7, article 320 (2024) — Nature Portfolio | https://pmc.ncbi.nlm.nih.gov/articles/PMC11574261/ |
+
+**Revised verdict for Ext. #4:** the original claim of "no peer-reviewed match found anywhere" should be softened. This npj Digital Medicine paper is a real, peer-reviewed, Nature-portfolio journal article that formally analyzes LLM cost-effectiveness at production scale — it is the closest peer-reviewed journal match found to date. It still does **not** frame the comparison the way FCNP does (deterministic linear-solve compute cost vs. metered LLM-API token cost as a formal dual axis); it instead analyzes query-batching/concatenation strategies to reduce token spend within an all-LLM pipeline. The novel element in FCNP — quantifying a *non-LLM, deterministic algorithm's* compute cost against an *LLM-API's* token cost as two sides of the same evaluation table — still has no exact peer-reviewed precedent, but the topic area itself is now shown to have real journal-tier engagement, which is a stronger position for a defense than "nothing exists."
+
+**Extension #5 (agricultural domain) — stronger peer-reviewed comparators than IJARCCE:**
+
+| Paper | Journal | Link |
+|---|---|---|
+| Ibrahim, A., Senthilkumar, K., Saito, K. "Evaluating responses by ChatGPT to farmers' questions on irrigated lowland rice cultivation in Nigeria." | **Scientific Reports**, vol. 14 (2024) — Nature Portfolio | https://pmc.ncbi.nlm.nih.gov/articles/PMC10858882/ |
+| "Large language models can help boost food production, but be mindful of their risks." | **Frontiers in Artificial Intelligence** (2024) | https://pmc.ncbi.nlm.nih.gov/articles/PMC11543567/ |
+| "A Systematic Review of IoT Solutions for Smart Farming." | **Sensors** (MDPI), vol. 20, no. 15, 4231 (2020) | https://pmc.ncbi.nlm.nih.gov/articles/PMC7436012/ |
+
+**Revised verdict for Ext. #5:** Scientific Reports (Nature Portfolio) is a substantially stronger peer-reviewed comparator than IJARCCE (lower-tier). It confirms LLM-assisted farmer Q&A is an active, top-journal-adjacent research area — but it evaluates a generic conversational LLM (ChatGPT) on rice cultivation Q&A, not a flow/graph-based context-compression method on structured price-record retrieval. The FCNP-specific angle (Kirchhoff-flow compression applied to mandi/APMC price API responses) still has no direct peer-reviewed precedent found; lean on this in the defense as the specific novel intersection, not on "no one has used LLMs for farmers" (they have).
+
 ## 9. Open items before finalizing the defense
 
 1. Do one more targeted search in systems venues (MLSys, OSDI, SOSP) for Extension #4 before claiming no prior art exists.
