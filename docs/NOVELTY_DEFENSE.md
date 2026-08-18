@@ -166,6 +166,33 @@ These are review/survey papers, useful for a defense to show the Physarum-algori
 
 **Revised verdict for Ext. #5:** Scientific Reports (Nature Portfolio) is a substantially stronger peer-reviewed comparator than IJARCCE (lower-tier). It confirms LLM-assisted farmer Q&A is an active, top-journal-adjacent research area — but it evaluates a generic conversational LLM (ChatGPT) on rice cultivation Q&A, not a flow/graph-based context-compression method on structured price-record retrieval. The FCNP-specific angle (Kirchhoff-flow compression applied to mandi/APMC price API responses) still has no direct peer-reviewed precedent found; lean on this in the defense as the specific novel intersection, not on "no one has used LLMs for farmers" (they have).
 
+## 9b. Closest single system-architecture match found (whole-pipeline comparison)
+
+*Question asked: not "is the mechanism prior art" but "which peer-reviewed journal paper's end-to-end system architecture most closely resembles FCNP's own pipeline (graph-of-nodes → physical-transport equation → per-node aggregate flow score → rank → keep/prune)?"*
+
+**Closest match: Hu, H., Zheng, J., Hu, W., Wang, F., Wang, G., Zhao, J., Wang, L. "Excavating important nodes in complex networks based on the heat conduction model."** ***Scientific Reports*, vol. 14, article 7740 (2024), Springer Nature/Nature Portfolio.** DOI: [10.1038/s41598-024-58320-3](https://doi.org/10.1038/s41598-024-58320-3). Verified directly against the live PMC page (PMCID PMC10987567).
+
+**Side-by-side architecture comparison:**
+
+| Pipeline stage | FCNP (this repo) | HCM (Sci Rep 2024) |
+|---|---|---|
+| Input representation | Context chunks as nodes in a conductance network | Entities as nodes in an undirected, unweighted graph \(G=(V,E)\) with adjacency matrix \(A\) |
+| Physical analogy | Electrical/Physarum conductance network (Kirchhoff's laws) | Heat-conduction model, \(Q=\Delta T\cdot K\cdot A/\Delta L\) |
+| Core solve step | Solve the Kirchhoff linear system \(L(D)\mathbf{p}=\mathbf{I}\) for node potentials \(p\) | Closed-form per-pair computation — no linear system is solved; \(\Delta T\) (eigenvector-centrality difference), \(K\) (network density), \(A\) (degree density), \(\Delta L\) (shortest-path distance) are substituted directly into the heat equation |
+| Per-edge/pairwise flow | \(Q_{ij}=D_{ij}\lvert p_i-p_j\rvert\) (edge flow from the potential solve) | \(Q(v_i,v_j)=D(v_i)\cdot e^{EC(v_i)-EC(v_j)}\cdot Density(G)\cdot Dd(v_i,v_j)/R_{v_i,v_j}\) (pairwise "heat output") |
+| Conductance/weight update | Iterative Physarum rule \(D_{ij}(t+1)=(1-\mu)D_{ij}+\alpha\lvert Q_{ij}\rvert^{\gamma}\) — network structure itself evolves round over round | No iterative structural update — HCM computes output values once per static graph snapshot |
+| Per-node aggregation | Node flow used directly (and via extensions: entropy of the flow distribution) to drive keep/prune/summarize decisions | Output capacity \(I(v_i)=\frac{1}{N-1}\sum_{j\neq i}Q(v_i,v_j)\) — average pairwise output across all other nodes |
+| Selection/pruning | Joint keep/summarize/drop decision for **all** chunks simultaneously, gated by flow value and (Ext #2/#3) tier assignment plus persistent-memory promotion/demotion | Nodes sorted in **descending order of \(I(v_i)\)**; top-\(K\) nodes selected as "important" (e.g., top 10) — structurally the same rank-and-truncate outcome, just without FCNP's tiering/memory extensions |
+| Validation method | F1/recall vs. compression ratio on ToolBench-derived context-selection tasks | Kendall-\(\tau\) correlation against SIR/IC epidemic-spread simulations across 9 real network datasets (David, Netscience, Hamsterster, Ca-GrQc, AS, Lastfm, Dblp, Ca-Astroph, EmailEU) |
+
+**Why this is the closest match, not just another Physarum citation:** every other citation in Sections 1–9a establishes prior art for a single *mechanism* (Physarum dynamics, Laplacian solves, cache tiering, LLM cost, agri-LLM). HCM is different — it is the one peer-reviewed journal paper found whose **overall pipeline shape** mirrors FCNP's end-to-end design: map a graph onto a physical-transport equation → compute a flow/output quantity per node-pair → aggregate to one importance score per node → rank → keep only the top set. If an examiner asks "what's the nearest published system to what you built," this is the strongest, most literal answer available in the literature search performed for this project.
+
+**Novelty verdict:** HCM is a **general complex-networks node-importance framework**, not an LLM/NLP method — it has no notion of tokens, prompts, context windows, or LLM-specific chunking, and it does not iterate/re-solve the network dynamically the way FCNP's Physarum-update loop does. FCNP's genuinely novel elements relative to HCM are: (1) the domain application to LLM context compression, (2) the *dynamic, iterative* Physarum-style conductance update (HCM's output values are a one-shot static computation), and (3) FCNP's downstream extensions (entropy-triggered re-pruning, hybrid tiering, persistent memory, cost quantification) that have no HCM analog at all. Cite HCM in the defense as: "the closest published system architecture uses heat conduction instead of electrical/Physarum flow, computes a static one-shot score instead of an iteratively-evolving network, and targets generic complex-networks node ranking rather than LLM context compression — confirming FCNP's application and dynamics are the novel contribution, not the general graph-flow-to-importance-score pattern itself."
+
+**Secondary architectural comparator:** Wu, S., Jiang, J., Huang, K. "Multi-granularity adaptive extractive document summarization with heterogeneous graph neural networks." *PeerJ Computer Science*, vol. 10 (2024). DOI: [10.7717/peerj-cs.1737](https://doi.org/10.7717/peerj-cs.1737). This also follows a graph-of-nodes → iterative propagation → per-node score → rank/select pipeline (word/sentence/topic nodes, GATv2 attention, LSTM-gated depth control, sentence classification, trigram-blocking selection) but the "flow" is a *learned* attention-weighted signal from a trained neural network, not a physics equation — architecturally further from FCNP than HCM, but confirms graph-node-ranking-then-truncation is a well-established pipeline shape across both physics-based and learned approaches.
+
+---
+
 ## 9. Open items before finalizing the defense
 
 1. Do one more targeted search in systems venues (MLSys, OSDI, SOSP) for Extension #4 before claiming no prior art exists.
