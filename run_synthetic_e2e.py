@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 
 from fcnp import (
-    ALL_BASELINES, FCNPConfig, FCNPMethod,
+    ALL_BASELINES, FCNPConfig, FCNPMethod, FCNPHybridMethod,
     ToolBenchExample, evaluate_all, aggregate, write_report,
 )
 
@@ -80,6 +80,11 @@ def main():
     )
     methods = {name: cls() for name, cls in ALL_BASELINES.items()}
     methods["FCNP"] = FCNPMethod(config=fcnp_cfg)
+    # Improvement #2 showcase row: same graph/config, but hybrid
+    # keep/summarize/drop tiering instead of a strict top-K cutoff.
+    # Expected to trade a larger output-token budget for higher recall
+    # relative to the plain "FCNP" row above.
+    methods["FCNP-Hybrid"] = FCNPHybridMethod(config=fcnp_cfg)
 
     print(f"[fcnp] running {len(methods)} methods on {sum(len(v) for v in examples.values())} examples...")
     t0 = time.perf_counter()

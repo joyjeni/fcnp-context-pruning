@@ -6,4 +6,5 @@ sentence-transformers==3.0.1
 rank-bm25==0.2.2
 plotly==5.24.1
 numpy
+requests
 git+https://github.com/joyjeni/fcnp-context-pruning.git

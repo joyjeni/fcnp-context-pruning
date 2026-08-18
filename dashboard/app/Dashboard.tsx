@@ -118,6 +118,31 @@ export default function Dashboard({ metrics }: { metrics: MetricsPayload | null 
         </div>
       </div>
 
+      <h2>New in this version</h2>
+      <div className="grid">
+        <div className="card">
+          <div className="label">#1 Dynamic re-pruning trigger</div>
+          <div className="sublabel">Flow-entropy signal fires re-prune on drift, not a fixed clock</div>
+        </div>
+        <div className="card">
+          <div className="label">#2 Hybrid tiering</div>
+          <div className="value">{metrics.config?.enable_hybrid_tiering ? 'ON' : 'OFF'}</div>
+          <div className="sublabel">summarize top {fmt((metrics.config?.summarize_top_k_fraction ?? 0) * 100, 0)}% instead of dropping · max {metrics.config?.summary_max_tokens ?? '—'} tok/summary</div>
+        </div>
+        <div className="card">
+          <div className="label">#3 Persistent memory tier</div>
+          <div className="sublabel">Flow-earned promotion/demotion, no unbounded growth</div>
+        </div>
+        <div className="card">
+          <div className="label">#5 Compute vs token cost</div>
+          <div className="sublabel">Deterministic linear solve vs metered LLM-compression calls</div>
+        </div>
+        <div className="card">
+          <div className="label">Real Agri data (data.gov.in)</div>
+          <div className="sublabel">Karnataka-first mandi prices, national fallback when empty</div>
+        </div>
+      </div>
+
       <h2>Pareto frontier — accuracy vs compression</h2>
       <div className="chart-card">
         <ResponsiveContainer width="100%" height={340}>

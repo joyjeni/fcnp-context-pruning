@@ -14,7 +14,9 @@ dashboard linked in this Space's README.
 
 from __future__ import annotations
 
+import os
 import time
+from pathlib import Path
 
 import gradio as gr
 import numpy as np
@@ -22,7 +24,40 @@ import plotly.graph_objects as go
 import spaces
 
 from fcnp.pruner import FlowBasedNetworkPruner, FCNPConfig
-from fcnp.types import ContextElement
+from fcnp.types import ContextElement, Tier
+from fcnp.data_gov_agri import (
+    RESOURCE_CITATION,
+    RESOURCE_URL,
+    load_snapshot,
+    snapshot_to_candidate_lines,
+)
+from fcnp.cost import cost_comparison_table, format_markdown_table
+
+_SNAPSHOT_PATH = Path(__file__).parent / "data" / "agri_mandi_snapshot.json"
+_AGRI_SNAPSHOT = None
+
+
+def _get_agri_snapshot():
+    """Load the real data.gov.in mandi-price snapshot bundled with this Space.
+
+    Prefers a live fetch when ``DATA_GOV_API_KEY`` is set as an HF Space
+    secret; otherwise falls back to the static snapshot committed at
+    deploy time (see fcnp/data_gov_agri.py for the fetch/fallback logic).
+    """
+    global _AGRI_SNAPSHOT
+    if _AGRI_SNAPSHOT is not None:
+        return _AGRI_SNAPSHOT
+    api_key = os.environ.get("DATA_GOV_API_KEY", "")
+    if api_key:
+        try:
+            from fcnp.data_gov_agri import fetch_snapshot_live
+
+            _AGRI_SNAPSHOT = fetch_snapshot_live(api_key)
+            return _AGRI_SNAPSHOT
+        except Exception:
+            pass  # fall through to bundled snapshot
+    _AGRI_SNAPSHOT = load_snapshot(_SNAPSHOT_PATH)
+    return _AGRI_SNAPSHOT
 
 _ENCODER = None
 
@@ -72,7 +107,7 @@ def _dense_rank(query_vec: np.ndarray, doc_vecs: np.ndarray) -> list[int]:
 
 
 @spaces.GPU
-def run_comparison(query: str, candidates_raw: str, keep_fraction: float):
+def run_comparison(query: str, candidates_raw: str, keep_fraction: float, enable_hybrid: bool):
     parsed = _parse_candidates(candidates_raw)
     if not query.strip() or len(parsed) < 2:
         raise gr.Error("Provide a query and at least 2 candidate lines.")
@@ -100,22 +135,40 @@ def run_comparison(query: str, candidates_raw: str, keep_fraction: float):
         mu=0.10,
         alpha=0.50,
         gamma=1.20,
+        keep_top_k_fraction=keep_fraction,
+        summarize_top_k_fraction=0.20,
+        enable_hybrid_tiering=enable_hybrid,
     )
     pruner = FlowBasedNetworkPruner(cfg)
     t0 = time.perf_counter()
-    result = pruner.prune(elements, query_embedding=query_vec)
+    result = pruner.prune(elements, query_embedding=query_vec, query_text=query)
     t_fcnp = (time.perf_counter() - t0) * 1000
-    flow_order = list(np.argsort(-result.node_flow))[:k]
-    fcnp_ids = {ids[i] for i in flow_order}
+    fcnp_ids = {e.id for e in result.survivors}
     kept_by_method["FCNP"] = fcnp_ids
+    status = "converged" if result.converged else f"stopped @ {result.iterations}"
+    if enable_hybrid:
+        tier_summary = ", ".join(f"{k2}={v}" for k2, v in sorted(result.tier_counts.items()))
+        status = f"{status} | tiers: {tier_summary}"
     rows.append(
         [
-            "FCNP",
+            "FCNP" + ("-Hybrid" if enable_hybrid else ""),
             ", ".join(sorted(fcnp_ids)),
-            f"{n / max(k, 1):.2f}x",
+            f"{result.compression_ratio:.2f}x",
             f"{t_fcnp:.2f} ms",
-            "converged" if result.converged else f"stopped @ {result.iterations}",
+            status,
         ]
+    )
+
+    tier_lines = []
+    if enable_hybrid:
+        for e in sorted(result.survivors, key=lambda x: -(x.importance or 0)):
+            tag = e.tier.value if e.tier else "?"
+            shown_text = e.output_text()
+            tier_lines.append(f"- **[{tag}]** `{e.id}` — {shown_text[:140]}")
+    tier_panel = (
+        "### Hybrid tier assignment\n" + "\n".join(tier_lines)
+        if tier_lines
+        else "_Enable \"hybrid tiering\" above to see per-item keep/summarize/drop/persistent tags._"
     )
 
     # --- Dense top-k cosine ---
@@ -166,7 +219,21 @@ def run_comparison(query: str, candidates_raw: str, keep_fraction: float):
         yaxis_title="aggregate flow",
     )
 
-    return rows, note, flow_chart
+    cost_note = ""
+    if enable_hybrid:
+        n_summarized = result.tier_counts.get("summarize", 0)
+        comp = cost_comparison_table(fcnp_latencies_ms=[t_fcnp], n_reprune_events=max(1, n_summarized))
+        cost_note = (
+            "\n\n### Compute-cost vs token-cost (improvement #5)\n"
+            + format_markdown_table(comp)
+            + "\n\n_FCNP's summarization step above used the built-in "
+            "dependency-free extractive summarizer — zero LLM calls. The "
+            "table shows what an LLM-driven compressor would have cost "
+            "instead for the same number of compression events "
+            f"({max(1, n_summarized)})."
+        )
+
+    return rows, note + cost_note, flow_chart, tier_panel
 
 
 EXAMPLE_QUERY = "Help me check the weather and book a flight for my trip to Bangalore."
@@ -181,6 +248,25 @@ calendar_distractor_4 | Create and manage calendar events.
 translate_distractor_5 | Translate text between languages.
 news_distractor_6 | Fetch top news headlines by category."""
 
+AGRI_EXAMPLE_QUERY = "Which mandi has the best tomato and onion prices in Karnataka today?"
+
+
+def _agri_example_candidates() -> str:
+    snap = _get_agri_snapshot()
+    lines = snapshot_to_candidate_lines(snap, limit=25)
+    return "\n".join(f"{cid} | {text}" for cid, text in lines)
+
+
+def load_example_set(choice: str):
+    if choice == "Real Agri mandi prices (data.gov.in)":
+        snap = _get_agri_snapshot()
+        fallback_note = (
+            f"_Source: [{RESOURCE_CITATION}]({RESOURCE_URL}) — fetched {snap.fetched_at}. "
+            f"{snap.notes}_"
+        )
+        return AGRI_EXAMPLE_QUERY, _agri_example_candidates(), fallback_note
+    return EXAMPLE_QUERY, EXAMPLE_CANDIDATES, "_Synthetic weather/flight-tool example set._"
+
 with gr.Blocks(title="FCNP Context Pruning Demo") as demo:
     gr.Markdown(
         "# FCNP — Flow-Based Context Network Pruning\n"
@@ -190,10 +276,23 @@ with gr.Blocks(title="FCNP Context Pruning Demo") as demo:
         "This demo shows *mechanism*, not accuracy — there's no ground-truth label for "
         "freeform text. For the ground-truth ToolBench benchmark numbers (where FCNP "
         "currently does **not** beat dense top-k on F1, see the "
-        "[GitHub README](https://github.com/joyjeni/fcnp-context-pruning#readme))."
+        "[GitHub README](https://github.com/joyjeni/fcnp-context-pruning#readme)).\n\n"
+        "**New:** toggle *hybrid tiering* to see improvements #1–#3 in action — medium-flow "
+        "items get summarized instead of dropped, high-flow items are force-kept across "
+        "rounds via a persistent-memory tier, and re-pruning is only triggered when the "
+        "context's flow-entropy actually drifts. Switch the example set to real Karnataka "
+        "mandi (market) prices from data.gov.in, in the same catalog style as the sibling "
+        "[Session-Aware ToolBench Rerank](https://github.com/joyjeni/session-aware-toolbench-rerank) "
+        "project's Agri extension."
     )
     with gr.Row():
         with gr.Column(scale=1):
+            example_set = gr.Radio(
+                label="Example set",
+                choices=["Synthetic (weather/flight tools)", "Real Agri mandi prices (data.gov.in)"],
+                value="Synthetic (weather/flight tools)",
+            )
+            source_note = gr.Markdown("_Synthetic weather/flight-tool example set._")
             query_in = gr.Textbox(label="Query", value=EXAMPLE_QUERY, lines=2)
             cands_in = gr.Textbox(
                 label="Candidates (one per line, 'id | text')",
@@ -203,6 +302,11 @@ with gr.Blocks(title="FCNP Context Pruning Demo") as demo:
             frac_in = gr.Slider(
                 label="Keep fraction", minimum=0.1, maximum=0.9, value=0.2, step=0.05
             )
+            hybrid_in = gr.Checkbox(
+                label="Enable hybrid tiering (improvements #1–#3: dynamic trigger, "
+                "keep/summarize/drop/persistent tiers)",
+                value=False,
+            )
             run_btn = gr.Button("Run comparison", variant="primary")
         with gr.Column(scale=1):
             table_out = gr.Dataframe(
@@ -211,11 +315,18 @@ with gr.Blocks(title="FCNP Context Pruning Demo") as demo:
             )
             note_out = gr.Markdown()
             flow_out = gr.Plot(label="FCNP node flow scores")
+            tier_out = gr.Markdown()
+
+    example_set.change(
+        load_example_set,
+        inputs=[example_set],
+        outputs=[query_in, cands_in, source_note],
+    )
 
     run_btn.click(
         run_comparison,
-        inputs=[query_in, cands_in, frac_in],
-        outputs=[table_out, note_out, flow_out],
+        inputs=[query_in, cands_in, frac_in, hybrid_in],
+        outputs=[table_out, note_out, flow_out, tier_out],
     )
 
 if __name__ == "__main__":

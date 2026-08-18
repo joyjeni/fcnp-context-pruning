@@ -28,6 +28,7 @@ from fcnp.baselines.simple import (
 from fcnp.baselines.retrieval import BM25Baseline, DenseTopKBaseline
 from fcnp.baselines.selective_context import SelectiveContextProxyBaseline
 from fcnp.baselines.llmlingua import LLMLinguaProxyBaseline
+from fcnp.baselines.fcnp_hybrid_wrapper import FCNPHybridMethod
 
 ALL_BASELINES = {
     "NoCompression": NoCompressionBaseline,
@@ -49,5 +50,6 @@ __all__ = [
     "DenseTopKBaseline",
     "SelectiveContextProxyBaseline",
     "LLMLinguaProxyBaseline",
+    "FCNPHybridMethod",
     "ALL_BASELINES",
 ]

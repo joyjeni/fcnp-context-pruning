@@ -24,6 +24,47 @@ FCNP models the context window as a conductance network: each chunk of retrieved
 
 ---
 
+## New in this version: Autonomous Context Management
+
+Five improvements motivated by ["Active Context Compression: Autonomous Memory Management in LLM Agents"](https://arxiv.org/abs/2601.07190) (arXiv:2601.07190, the "Focus" system), applied on top of FCNP's existing flow-based pruning core:
+
+| # | Improvement | Module | Idea |
+|---|---|---|---|
+| 1 | Dynamic flow-entropy re-pruning trigger | [`fcnp/trigger.py`](fcnp/trigger.py) | Focus re-compresses on a fixed schedule; FCNP already produces a per-round node-flow distribution for free. `DynamicReprioritizationTrigger` tracks the Shannon entropy of that distribution across rounds and fires a re-prune only when the context has genuinely drifted or concentrated, plus a stagnation backstop. |
+| 2 | Hybrid keep-verbatim / summarize / drop tiering | [`fcnp/pruner.py`](fcnp/pruner.py), [`fcnp/summarize.py`](fcnp/summarize.py) | Instead of a hard top-K cutoff, medium-flow survivors get extractively summarized instead of dropped outright — trading a larger output-token budget for materially higher recall. Opt-in via `FCNPConfig(enable_hybrid_tiering=True)`; the original strict top-K `FCNP` benchmark row is untouched (default `False`). |
+| 3 | Persistent high-flow memory tier | [`fcnp/memory.py`](fcnp/memory.py) | A principled, flow-driven analog of Focus's manually-curated "Knowledge" block — an element is *promoted* into a small cross-round persistent set once it has repeatedly earned high flow, and *demoted* if it stops earning it, so the set never grows unbounded. |
+| 4 | *(not separately implemented this round)* | — | — |
+| 5 | Compute-cost vs token-cost quantification | [`fcnp/cost.py`](fcnp/cost.py) | FCNP's cost is a deterministic linear solve — pure wall-clock compute, zero token bill. Focus-style LLM-based compressors instead spend metered tokens on every compression event. `cost_comparison_table()` / `format_markdown_table()` make that difference explicit and auditable (see table below) rather than asserting "FCNP is cheaper" as a slogan. |
+
+[`fcnp/session.py`](fcnp/session.py)'s `AutonomousContextSession` wires all three (#1/#2/#3) into a single orchestrator for long-running agent sessions: `session.observe(new_elements, query_embedding=..., query_text=...)` defers re-pruning until the dynamic trigger fires, then prunes with hybrid tiering and persistent-memory force-inclusion enabled by default.
+
+### Compute-cost vs token-cost (illustrative)
+
+```
+| Metric | FCNP (5 events) | LLM-based compression (5 events) |
+|---|---|---|
+| Total latency | 5.0 ms | 4500.0 ms |
+| Avg latency / event | 5.0 ms | 900.0 ms |
+| Token cost | $0.00 (no LLM call) | $0.045 ($0.009/event) |
+| Mechanism | Laplacian linear solve | LLM read+summarize call |
+| Latency speedup | ~900x faster | baseline |
+```
+
+Generate this table live from `fcnp.cost.cost_comparison_table()` / `format_markdown_table()` — the LLM cost model's per-call token/price assumptions are labeled inputs you can override, not a measurement of any specific vendor's production costs.
+
+### FCNP vs FCNP-Hybrid: the recall/compression tradeoff
+
+`FCNPHybridMethod` ([`fcnp/baselines/fcnp_hybrid_wrapper.py`](fcnp/baselines/fcnp_hybrid_wrapper.py)) exposes hybrid tiering as its own benchmark row, so the original `FCNP` numbers stay exactly reproducible. Reproduce with `python run_hybrid_comparison.py` (writes `results/summary_with_hybrid.md`). Across every run on the small (n=30) synthetic harness, the direction is consistent even though this harness's absolute numbers vary run-to-run (see caveat below): **FCNP-Hybrid trades a lower compression ratio for higher recall/nDCG**, because medium-flow items are summarized into the output instead of being dropped outright. One representative run:
+
+| Method | Recall | Precision | F1 | nDCG | Compression × |
+|---|---:|---:|---:|---:|---:|
+| FCNP | 0.113 | 0.113 | 0.113 | 0.149 | 15.42× |
+| FCNP-Hybrid | 0.227 | 0.054 | 0.087 | 0.204 | 3.89× |
+
+> **Caveat**: this synthetic harness's default fallback embedder and oracle-k selection are not fully seeded end-to-end, so absolute F1/Recall numbers vary noticeably between runs of `run_hybrid_comparison.py` (observed F1 for `FCNP` ranged 0.11–0.72 across runs during development). The **qualitative direction — Hybrid always wins on recall/nDCG and always loses on compression ratio relative to plain FCNP — held on every run tested.** Full precision-scale numbers require the real ToolBench Kaggle run with a fixed embedder seed; see [`results/summary_with_hybrid.md`](results/summary_with_hybrid.md) for the exact run behind the table above.
+
+---
+
 ## Productionization: Kaggle → Vercel → Hugging Face
 
 **GitHub Repository**: https://github.com/joyjeni/fcnp-context-pruning
@@ -62,7 +103,9 @@ vercel deploy --prod
 
 **Live**: [huggingface.co/spaces/abigailcreations/compression](https://huggingface.co/spaces/abigailcreations/compression)
 
-`hf_space/` contains a self-contained Gradio app (`app.py`) that lets anyone paste a query + candidate list and see FCNP vs BM25 vs DenseTopK vs Random pick different (or the same) subset live, using the real `fcnp` package from this repo.
+`hf_space/` contains a self-contained Gradio app (`app.py`) that lets anyone paste a query + candidate list and see FCNP vs BM25 vs DenseTopK vs Random pick different (or the same) subset live, using the real `fcnp` package from this repo. It also lets you:
+- Switch the example set between synthetic weather/flight-tool candidates and **real Karnataka mandi prices from data.gov.in** (see Data Sources above), with the fetch/fallback status shown directly in the UI.
+- Toggle **hybrid tiering** (improvements #1–#3) to see per-item keep-verbatim / summarize / drop / persistent tags and the resulting recall/compression tradeoff live, alongside a compute-cost-vs-token-cost table (improvement #5).
 
 To publish your own copy:
 1. Create a new Space at [huggingface.co/new-space](https://huggingface.co/new-space) (SDK: Gradio).
@@ -149,16 +192,22 @@ Honest numbers, straight from [`results/summary.md`](results/summary.md) / [`res
 
 ## Data Sources
 
-### data.gov.in — Mandi Price Tables
+### data.gov.in — Mandi Price Tables (real, live-integrated)
 
 The primary use case that motivates FCNP's 10:1 compression target: a single data.gov.in API call for commodity prices may return **50–100+ records** (all mandis in a state for a given commodity). This exceeds a typical LLM's useful context budget.
 
-FCNP prunes the response to the **top-5 most relevant mandi records** for the farmer's query, preserving:
+This is no longer just a motivating scenario — [`fcnp/data_gov_agri.py`](fcnp/data_gov_agri.py) integrates the **real** data.gov.in resource [`9ef84268-d588-465a-a308-a864a43d0070`](https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070) ("Current Daily Price of Various Commodities from Various Markets (Mandi)", Ministry of Agriculture and Farmers Welfare — [data.gov.in listing](https://www.data.gov.in/resource/current-daily-price-various-commodities-various-markets-mandi)), and it powers the "Real Agri mandi prices" example set in the [Hugging Face Space](#3-hugging-face-space-interactive-demo).
+
+FCNP prunes the response to the **top-K most relevant mandi records** for the farmer's query, preserving:
 - The farmer's district/state preference (high conductance to local mandis)
 - The query commodity (high conductance to matching commodity records)
 - Recency (high conductance to today's prices)
 
 This makes the compressed context small enough to fit in the LLM's prompt while retaining all citation-worthy data.
+
+**Karnataka-first, national-fallback (a real, documented data-coverage gap, not a workaround to hide):** this resource is current-day-only with no historical query support, and on any given day it may have zero records for a specific state — confirmed empty for Karnataka on multiple test dates while other states reported normally. Server-side `filters[state]=...` query parameters were tested extensively and do not narrow this resource's results, so filtering happens client-side after fetching. `data_gov_agri.py` therefore: (1) fetches all pages, (2) filters for Karnataka records, (3) if none exist for the day, transparently falls back to a diverse national top-commodities sample and flags this via `AgriSnapshot.used_national_fallback` and a human-readable `notes` field — the app surfaces this note directly in the UI rather than silently substituting data. This mirrors the Agri-catalog pattern and Obj1↔Obj4 data-flow framing ("FCNP compresses mandi data from 50+ records to top-5") documented in the sibling PhD-pipeline project [Session-Aware ToolBench Rerank](https://github.com/joyjeni/session-aware-toolbench-rerank)'s `agri_extension/karnataka_apis.py`.
+
+A static snapshot fetched on 2026-08-18 (25 real Karnataka records, no fallback needed that day) ships at [`hf_space/data/agri_mandi_snapshot.json`](hf_space/data/agri_mandi_snapshot.json) so the deployed Space works without needing live API access at request time; set a `DATA_GOV_API_KEY` Space secret to fetch live instead (see `fcnp.data_gov_agri.fetch_snapshot_live`).
 
 ---
 
@@ -184,24 +233,38 @@ Output: pruned context C' ⊆ C, |C'| << |C|
 
 ## Repository Structure
 
+The layout below reflects the actual current repository (this superseded an earlier aspirational `src/`/`experiments/`/`kaggle/` sketch that no longer matches what's checked in):
+
 ```
 fcnp-context-pruning/
-├── src/
-│   ├── fcnp.py              # Core algorithm: Kirchhoff solve + physarum update
-│   ├── conductance.py       # Build D matrix from embeddings
-│   ├── laplacian.py         # L(D) construction and sparse solve
-│   ├── embedding.py         # google/embeddinggemma-300m wrapper
-│   └── pruner.py            # Top-K selection, citation preservation
-├── experiments/
-│   └── fcnp_toolbench_benchmark.py   # All 7 baselines, F1@K, citation accuracy
-├── kaggle/
-│   └── fcnp_toolbench_benchmark.ipynb
-├── dashboard/               # Vercel deployment: conductance graph visualisation
-│   ├── src/
-│   │   └── App.jsx          # React conductance graph + flow visualiser
+├── fcnp/                          # Core package
+│   ├── pruner.py                  # Kirchhoff solve, top-K + hybrid tiering, FlowBasedNetworkPruner
+│   ├── trigger.py                 # Improvement #1: dynamic flow-entropy re-pruning trigger
+│   ├── memory.py                  # Improvement #3: persistent high-flow memory tier
+│   ├── summarize.py                # Improvement #2: extractive summarizer for hybrid tiering
+│   ├── cost.py                    # Improvement #5: compute-cost vs token-cost quantification
+│   ├── session.py                 # AutonomousContextSession — wires #1/#2/#3 together
+│   ├── data_gov_agri.py           # Real data.gov.in mandi-price fetch + Karnataka-first fallback
+│   ├── eval.py, metrics.py, report.py, types.py
+│   ├── baselines/                 # BM25, SelectiveContext, LLMLingua, DenseTopK, Random, FCNP, FCNP-Hybrid wrappers
+│   └── datasets/toolbench.py      # Synthetic ToolBench-shaped example generator
+├── notebooks/
+│   ├── build_notebook.py          # Generates the notebook below (source of truth — edit this, not the .ipynb)
+│   └── fcnp_toolbench_benchmark.ipynb   # Kaggle-runnable benchmark + Agri case study
+├── hf_space/                      # Hugging Face Space (Gradio demo)
+│   ├── app.py
+│   ├── data/agri_mandi_snapshot.json
+│   └── requirements.txt
+├── dashboard/                     # Vercel Next.js dashboard: live metrics, tables, charts
+│   ├── app/
 │   └── package.json
-└── docs/
-    └── README_OBJ4.md       # This file
+├── run_synthetic_e2e.py           # End-to-end synthetic benchmark runner (writes results/)
+├── run_hybrid_comparison.py       # FCNP vs FCNP-Hybrid comparison (writes results/*_with_hybrid.*)
+├── tests/                         # pytest suite (47 tests)
+├── results/                       # summary.md / metrics.json / results.csv (canonical + _with_hybrid variants)
+├── figures/, diagrams/            # Architecture and algorithm-flow diagrams
+├── paper/                         # Draft manuscript (paper.md, FCNP_paper.pdf, build script)
+└── README.md                      # This file
 ```
 
 ---

@@ -49,7 +49,9 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from fcnp.types import ContextElement, PruneResult
+from fcnp.summarize import extractive_summarize
+from fcnp.types import ContextElement, PruneResult, Tier
+from fcnp.memory import PersistentMemoryTier  # noqa: F401  (type-hint reference)
 
 
 @dataclass
@@ -60,18 +62,37 @@ class FCNPConfig:
     mu: float = 0.10                     # decay rate of conductance
     alpha: float = 0.50                  # reinforcement gain
     gamma: float = 1.20                  # non-linearity exponent (>1)
-    keep_top_k_fraction: float = 0.10    # node retention budget after prune
+    keep_top_k_fraction: float = 0.10    # KEEP_VERBATIM retention budget (improvement #2)
+    summarize_top_k_fraction: float = 0.20  # additional fraction sent to SUMMARIZE tier, not dropped
     current_injection: float = 1.0
     laplacian_regularization: float = 1e-9
+    # Improvement #2 is opt-in at the FCNPConfig level so prune()'s
+    # default behavior (and every existing caller: eval.py baselines,
+    # hf_space/app.py, published benchmark numbers) stays byte-for-byte
+    # a strict top-K cutoff unless a caller explicitly asks for hybrid
+    # tiering. See fcnp/baselines/fcnp_hybrid_wrapper.py for the opt-in
+    # benchmark row and hf_space/app.py's UI toggle for the opt-in demo.
+    enable_hybrid_tiering: bool = False
+    summary_max_tokens: int = 40
 
 
 class FlowBasedNetworkPruner:
     """Iterative current-reinforced pruning of a semantic context graph."""
 
-    def __init__(self, config: FCNPConfig | None = None):
+    def __init__(
+        self,
+        config: FCNPConfig | None = None,
+        persistent_memory: "PersistentMemoryTier | None" = None,
+        summarizer=None,
+    ):
         self.config = config or FCNPConfig()
         self.iterations_ran: int = 0
         self.converged: bool = False
+        # Improvement #3: optional cross-round persistent high-flow tier.
+        self.persistent_memory = persistent_memory
+        # Improvement #2: pluggable summarizer; defaults to the built-in
+        # dependency-free extractive summarizer (fcnp.summarize).
+        self.summarizer = summarizer
 
     # ------------------------------------------------------------------
     # Graph construction
@@ -172,6 +193,7 @@ class FlowBasedNetworkPruner:
         self,
         elements: list[ContextElement],
         query_embedding: np.ndarray | None = None,
+        query_text: str | None = None,
     ) -> PruneResult:
         """Run current-reinforcement loop and return pruned elements.
 
@@ -181,6 +203,10 @@ class FlowBasedNetworkPruner:
         query_embedding : np.ndarray | None
             Optional dense vector for the downstream task. Elements
             aligned with the query become stronger current sources.
+        query_text : str | None
+            Raw query string, used only by the default extractive
+            summarizer (improvement #2) to bias sentence selection
+            inside SUMMARIZE-tier elements. Optional.
 
         Returns
         -------
@@ -199,6 +225,7 @@ class FlowBasedNetworkPruner:
                 input_tokens=0, output_tokens=0,
                 iterations=0, converged=True,
                 node_flow=np.zeros(0),
+                tier_counts={}, persistent_ids=[],
             )
 
         adjacency = self._build_adjacency(elements)
@@ -229,18 +256,70 @@ class FlowBasedNetworkPruner:
 
         # Aggregate flow per real node (sum across all incident edges including sink)
         node_flow = D_aug[:n, :].sum(axis=1)
-
-        # Keep top-K nodes
-        keep_k = max(1, int(np.ceil(cfg.keep_top_k_fraction * n)))
-        order = np.argsort(-node_flow)
-        top_idx = order[:keep_k]
-
-        survivors = [elements[i] for i in top_idx]
         max_flow = float(node_flow.max()) if node_flow.max() > 0 else 1.0
-        for i, idx in enumerate(top_idx):
-            survivors[i].importance = float(node_flow[idx] / max_flow)
+        order = np.argsort(-node_flow)
 
-        output_tokens = sum(e.token_count() for e in survivors)
+        # ------------------------------------------------------------
+        # Improvement #3: persistent high-flow memory tier.
+        # Feed this round's ranking to the persistent-memory tracker (if
+        # attached) so it can promote/demote based on multi-round history,
+        # then force-include any currently-persistent elements regardless
+        # of where they landed in *this* round's raw ranking.
+        # ------------------------------------------------------------
+        persistent_ids_this_round: set[str] = set()
+        if self.persistent_memory is not None:
+            ranked_pairs = [
+                (elements[idx].id, float(node_flow[idx] / max_flow)) for idx in order
+            ]
+            self.persistent_memory.update(ranked_pairs)
+            persistent_ids_this_round = self.persistent_memory.persistent_ids()
+
+        # ------------------------------------------------------------
+        # Improvement #2: hybrid tiering instead of a hard top-K cutoff.
+        #   KEEP_VERBATIM : top keep_top_k_fraction of flow
+        #   SUMMARIZE     : next summarize_top_k_fraction of flow
+        #   DROP          : everything else
+        #   PERSISTENT    : always KEEP_VERBATIM-equivalent, independent
+        #                   of this round's rank (improvement #3 override)
+        # ------------------------------------------------------------
+        keep_k = max(1, int(np.ceil(cfg.keep_top_k_fraction * n)))
+        summarize_k = int(np.ceil(cfg.summarize_top_k_fraction * n)) if cfg.enable_hybrid_tiering else 0
+
+        keep_idx = set(order[:keep_k].tolist())
+        summarize_idx = set(order[keep_k:keep_k + summarize_k].tolist()) if summarize_k else set()
+
+        survivor_idx: list[int] = []
+        for rank_pos, idx in enumerate(order):
+            el = elements[idx]
+            is_persistent = el.id in persistent_ids_this_round
+            if is_persistent:
+                el.tier = Tier.PERSISTENT
+                survivor_idx.append(idx)
+            elif idx in keep_idx:
+                el.tier = Tier.KEEP_VERBATIM
+                survivor_idx.append(idx)
+            elif cfg.enable_hybrid_tiering and idx in summarize_idx:
+                el.tier = Tier.SUMMARIZE
+                summarizer_fn = self.summarizer or extractive_summarize
+                el.summary_text = summarizer_fn(el.text, query_text, cfg.summary_max_tokens)
+                survivor_idx.append(idx)
+            else:
+                el.tier = Tier.DROP
+                # not included in survivors
+
+        # Preserve original flow-descending order among survivors.
+        survivor_idx = sorted(set(survivor_idx), key=lambda i: -node_flow[i])
+        survivors = [elements[i] for i in survivor_idx]
+        for idx in survivor_idx:
+            elements[idx].importance = float(node_flow[idx] / max_flow)
+
+        tier_counts: dict[str, int] = {}
+        for el in survivors:
+            key = el.tier.value if el.tier else "unknown"
+            tier_counts[key] = tier_counts.get(key, 0) + 1
+        tier_counts["drop"] = n - len(survivors)
+
+        output_tokens = sum(e.output_token_count() for e in survivors)
 
         return PruneResult(
             survivors=survivors,
@@ -251,4 +330,6 @@ class FlowBasedNetworkPruner:
             iterations=self.iterations_ran,
             converged=self.converged,
             node_flow=node_flow,
+            tier_counts=tier_counts,
+            persistent_ids=sorted(persistent_ids_this_round),
         )
