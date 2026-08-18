@@ -45,13 +45,50 @@ export default function Dashboard({ metrics }: { metrics: MetricsPayload | null 
   const latencyP50 = primary?.latency_ms_p50 ?? 0;
 
   // Pareto data
-  const pareto = metrics.methods.map((m, i) => ({
+  const paretoBase = metrics.methods.map((m, i) => ({
     method: m.method,
     x: m.compression_ratio_mean,
     y: m.f1_mean,
     z: 50,
     color: m.method === metrics.primary_method ? PRIMARY_COLOR : COLORS[i % COLORS.length],
   }));
+
+  // Group points that are visually close (normalized by axis range) so their
+  // labels can be fanned out instead of stacking on top of each other.
+  const xValsAll = paretoBase.map(p => p.x);
+  const xSpan = (Math.max(...xValsAll) - Math.min(...xValsAll)) || 1;
+  const CLUSTER_THRESH = 0.07; // normalized distance (x/xSpan, y/1) to treat as "same cluster"
+  const clusterOf: number[] = new Array(paretoBase.length).fill(-1);
+  let nextClusterId = 0;
+  for (let i = 0; i < paretoBase.length; i++) {
+    if (clusterOf[i] !== -1) continue;
+    clusterOf[i] = nextClusterId;
+    for (let j = i + 1; j < paretoBase.length; j++) {
+      if (clusterOf[j] !== -1) continue;
+      const ndx = Math.abs(paretoBase[i].x - paretoBase[j].x) / xSpan;
+      const ndy = Math.abs(paretoBase[i].y - paretoBase[j].y) / 1;
+      if (ndx < CLUSTER_THRESH && ndy < CLUSTER_THRESH) clusterOf[j] = nextClusterId;
+    }
+    nextClusterId++;
+  }
+  const clusterSizes: Record<number, number> = {};
+  clusterOf.forEach(c => { clusterSizes[c] = (clusterSizes[c] ?? 0) + 1; });
+  const FAN_OFFSETS: Record<number, { dx: number; dy: number }[]> = {
+    1: [{ dx: 0, dy: -10 }],
+    2: [{ dx: -6, dy: -12 }, { dx: 6, dy: 18 }],
+    3: [{ dx: -46, dy: -10 }, { dx: 0, dy: 18 }, { dx: 46, dy: -10 }],
+    4: [{ dx: -60, dy: -14 }, { dx: -18, dy: 20 }, { dx: 18, dy: -30 }, { dx: 60, dy: 20 }],
+  };
+  const seenInCluster: Record<number, number> = {};
+  const pareto = paretoBase.map((p, i) => {
+    const cid = clusterOf[i];
+    const size = Math.min(clusterSizes[cid] ?? 1, 4);
+    const memberIdx = seenInCluster[cid] ?? 0;
+    seenInCluster[cid] = memberIdx + 1;
+    const offsets = FAN_OFFSETS[size] ?? FAN_OFFSETS[4];
+    const off = offsets[memberIdx % offsets.length];
+    return { ...p, labelDx: off.dx, labelDy: off.dy };
+  });
 
   // Latency
   const latency = [...metrics.methods]
@@ -146,7 +183,7 @@ export default function Dashboard({ metrics }: { metrics: MetricsPayload | null 
       <h2>Pareto frontier — accuracy vs compression</h2>
       <div className="chart-card">
         <ResponsiveContainer width="100%" height={340}>
-          <ScatterChart margin={{ top: 16, right: 24, bottom: 36, left: 8 }}>
+          <ScatterChart margin={{ top: 34, right: 48, bottom: 36, left: 8 }}>
             <CartesianGrid stroke="#21262d" />
             <XAxis type="number" dataKey="x" name="Compression ratio (×)"
                    stroke="#8b949e" tick={{ fill: '#8b949e', fontSize: 11 }}
@@ -168,10 +205,11 @@ export default function Dashboard({ metrics }: { metrics: MetricsPayload | null 
               <LabelList
                 dataKey="method"
                 content={(props: any) => {
-                  const { x, y, value, index } = props;
-                  const dy = index % 2 === 0 ? -10 : 16;
+                  const { x, y, value, payload } = props;
+                  const dx = payload?.labelDx ?? 0;
+                  const dy = payload?.labelDy ?? -10;
                   return (
-                    <text x={x} y={y + dy} fill="#c9d1d9" fontSize={11} textAnchor="middle">
+                    <text x={x + dx} y={y + dy} fill="#c9d1d9" fontSize={11} textAnchor="middle">
                       {value}
                     </text>
                   );
