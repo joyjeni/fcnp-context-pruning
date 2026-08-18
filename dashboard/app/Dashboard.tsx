@@ -165,7 +165,18 @@ export default function Dashboard({ metrics }: { metrics: MetricsPayload | null 
               {pareto.map((p, i) => (
                 <Scatter key={i} dataKey="y" fill={p.color} />
               ))}
-              <LabelList dataKey="method" position="top" fill="#c9d1d9" fontSize={11} />
+              <LabelList
+                dataKey="method"
+                content={(props: any) => {
+                  const { x, y, value, index } = props;
+                  const dy = index % 2 === 0 ? -10 : 16;
+                  return (
+                    <text x={x} y={y + dy} fill="#c9d1d9" fontSize={11} textAnchor="middle">
+                      {value}
+                    </text>
+                  );
+                }}
+              />
             </Scatter>
           </ScatterChart>
         </ResponsiveContainer>
