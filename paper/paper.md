@@ -207,21 +207,73 @@ Kaggle run; an example synthetic-data validation appears in
 - Random seeds and configs are recorded in every `metrics.json`
   payload.
 
-## 6. References
+## 6. Autonomous Context Management Extensions & Novelty Positioning
+
+Beyond the core Kirchhoff/Physarum pruning mechanism (Sections 2–4),
+this work adds five extensions for long-running agent sessions, plus
+a real-world agricultural deployment. Each is positioned here against
+the closest verifiable prior art rather than claimed as unqualified
+novel; full citation-by-citation detail is in
+`docs/NOVELTY_DEFENSE.md` in the code repository.
+
+| # | Extension | Mechanism | Closest verified prior art | Novelty verdict |
+|---|---|---|---|---|
+| 1 | Dynamic flow-entropy re-pruning trigger | Shannon entropy of the per-round node-flow distribution gates re-pruning instead of a fixed schedule | Entropy-triggered cache/retraining invalidation (arXiv preprints only; no exact peer-reviewed match) | Novel combination |
+| 2 | Hybrid keep-verbatim / summarize / drop tiering | Medium-flow survivors are extractively summarized rather than hard-dropped | LongLLMLingua (ACL 2024); "Characterizing Prompt Compression Methods for Long Context RAG" (ICML 2024) | Novel combination (weaker claim: general pattern is established, flow-gating is not) |
+| 3 | Persistent high-flow memory tier | Bounded promotion/demotion of elements that repeatedly earn high flow across rounds | MemGPT (arXiv); "FIFO can be Better than LRU: the Power of Lazy Promotion and Quick Demotion" (ACM HotOS 2023) | Novel combination only (promotion/demotion itself is established; flow-value gating is not) |
+| 4 | Compute-cost vs. token-cost quantification | Deterministic linear-solve wall-clock cost formalized against metered LLM-API token cost as an evaluation axis | No peer-reviewed match found; one tangential preprint (arXiv:2312.14972) on SLM-vs-API cost | Fully novel by absence of prior art (not exhaustively searched across systems venues) |
+| 5 | Agricultural domain application | FCNP applied to real-time data.gov.in mandi/APMC commodity-price API responses for farmer natural-language queries | "Krishi Mitra" (IJARCCE, May 2026 — lower-tier venue, generic ChromaDB RAG, not flow-based) | Novel combination/application |
+
+An `AutonomousContextSession` orchestrator wires extensions #1–#3
+into a single interface for long-running sessions:
+`session.observe(elements, query)` defers re-pruning until the
+entropy trigger fires, then prunes with hybrid tiering and
+persistent-memory force-inclusion.
+
+The core mechanism itself (Section 2) is **not** claimed as a novel
+algorithm — the Kirchhoff-solve-plus-Physarum-conductance update is
+15-year-old, peer-reviewed applied-math/biology literature (Tero et
+al. 2010; Bonifaci et al. 2012). The defensible claim is a **novel
+application** of that mechanism to LLM context-chunk selection, where
+no prior published work was found applying it to that problem.
+
+## 7. References
 
 - Bonifaci, V., Mehlhorn, K., Varma, G. *Physarum can compute shortest
-  paths.* J. Theor. Biol. 309, 2012.
+  paths.* J. Theor. Biol. 309, 121–133, 2012. DOI: 10.1016/j.jtbi.2012.06.017.
+- Einziger, G., Friedman, R., Manes, B. *TinyLFU: A Highly Efficient
+  Cache Admission Policy.* arXiv:1512.00727.
 - Jiang, H. et al. *LLMLingua: Compressing prompts for accelerated
-  inference of LLMs.* EMNLP 2023.
-- Jiang, H. et al. *LongLLMLingua.* ACL 2024.
+  inference of LLMs.* EMNLP 2023. DOI: 10.18653/v1/2023.emnlp-main.825.
+- Jiang, H. et al. *LongLLMLingua: Accelerating and Enhancing LLMs in
+  Long Context Scenarios via Prompt Compression.* ACL 2024.
+  arXiv:2310.06839.
 - Li, Y. *Compressing context to enhance inference efficiency of
-  LLMs.* EMNLP 2023.
+  LLMs.* EMNLP 2023. DOI: 10.18653/v1/2023.emnlp-main.391.
+- Packer, C. et al. *MemGPT: Towards LLMs as Operating Systems.*
+  arXiv:2310.08560.
 - Qin, Y. et al. *ToolLLM: Facilitating Large Language Models to
   Master 16000+ Real-world APIs.* ICLR 2024.
 - Robertson, S., Walker, S. *Some simple effective approximations to
   the 2-Poisson model for probabilistic weighted retrieval.* SIGIR
   1994.
+- Robertson, S., Zaragoza, H. *The Probabilistic Relevance Framework:
+  BM25 and Beyond.* Foundations and Trends in Information Retrieval
+  3(4), 333–389, 2009. DOI: 10.1561/1500000019.
 - Spielman, D. A. *Spectral graph theory and its applications.* FOCS
   2007.
 - Tero, A. et al. *Rules for biologically inspired adaptive network
-  design.* Science 327, 2010.
+  design.* Science 327(5964), 439–442, 2010. DOI: 10.1126/science.1177894.
+- "Characterizing Prompt Compression Methods for Long Context RAG."
+  ICML 2024. arXiv:2407.08892.
+- Yang, J. et al. *FIFO can be Better than LRU: the Power of Lazy
+  Promotion and Quick Demotion.* HotOS 2023 (ACM SIGOPS). DOI:
+  10.1145/3593856.3595887.
+
+**Note on non-peer-reviewed sources.** "Active Context Compression:
+Autonomous Memory Management in LLM Agents" (arXiv:2601.07190) is
+cited in the code repository's `README.md` only as motivating
+inspiration for extensions #1–#3 and #5. As of this writing it is an
+arXiv preprint with no confirmed peer-reviewed acceptance, and is
+deliberately **not** included in this reference list or relied upon
+as a citable source in this manuscript.

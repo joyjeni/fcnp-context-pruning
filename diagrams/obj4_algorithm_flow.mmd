@@ -1,0 +1,44 @@
+%%{init: {'theme':'base', 'themeVariables': {'fontFamily':'Times New Roman, Georgia, serif', 'fontSize':'14px'}}}%%
+flowchart TD
+    IN["Input: new context elements + query<br/>session.observe(elements, query)"]
+    PREP["Preprocess<br/>embed C,q -&gt; build D0 -&gt; inject I_i=cos_sim(c_i,q)"]
+
+    subgraph LOOP["Core: Kirchhoff / Physarum flow loop"]
+        direction LR
+        SOLVE["Solve<br/>L(D).p = I"]
+        FLOW["Flow<br/>Q_ij=D_ij|p_i-p_j|"]
+        UPD["Update D<br/>(1-mu)D+alpha|Q|^gamma"]
+        SOLVE --> FLOW --> UPD
+    end
+
+    CHK{"Converged?<br/>eps test"}
+    ENT["Ext #1: DynamicReprioritizationTrigger<br/>Shannon entropy of flow dist. across rounds"]
+    FIRE{"Entropy drift or<br/>stagnation backstop?"}
+    DEFER["Defer re-prune<br/>keep observing next round"]
+    TIER["Ext #2: Hybrid tiering<br/>keep-verbatim / summarize / drop by flow"]
+    MEM["Ext #3: Persistent memory tier<br/>promote/demote on repeated high flow"]
+    COST["Ext #5: Cost accounting<br/>linear-solve ms vs LLM-token $ (cost.py)"]
+    OUT["Output: pruned C'<br/>+ citations + cost table"]
+
+    IN --> PREP --> SOLVE
+    UPD --> CHK
+    CHK -- no --> SOLVE
+    CHK -- yes --> ENT --> FIRE
+    FIRE -- no --> DEFER -.-> IN
+    FIRE -- yes --> TIER
+    TIER --> MEM --> COST --> OUT
+
+    classDef io fill:#1F2A44,stroke:#0D1526,color:#FFFFFF,stroke-width:1px
+    classDef prep fill:#3D5A80,stroke:#26374F,color:#FFFFFF,stroke-width:1px
+    classDef loopstep fill:#6D93B8,stroke:#3D5A80,color:#FFFFFF,stroke-width:1px
+    classDef decision fill:#C4D7E0,stroke:#3D5A80,color:#1F2A44,stroke-width:1px
+    classDef ext fill:#8A6D3B,stroke:#5C481F,color:#FFFFFF,stroke-width:1px
+    classDef defer fill:#B0413E,stroke:#7A2C29,color:#FFFFFF,stroke-width:1px
+    classDef result fill:#1F2A44,stroke:#0D1526,color:#FFFFFF,stroke-width:1px
+
+    class IN,OUT io
+    class PREP prep
+    class SOLVE,FLOW,UPD loopstep
+    class CHK,FIRE decision
+    class ENT,TIER,MEM,COST ext
+    class DEFER defer

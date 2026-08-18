@@ -1,0 +1,40 @@
+%%{init: {'theme':'base', 'themeVariables': {'fontFamily':'Helvetica, Arial, sans-serif', 'fontSize':'16px', 'primaryTextColor':'#0B1F33'}}}%%
+flowchart LR
+    GH["<b>GitHub</b><br/>fcnp-context-pruning<br/><i>source of truth</i>"]
+    AGRI["<b>data.gov.in API</b><br/>Mandi/APMC price records<br/><i>real Karnataka + national</i>"]
+
+    subgraph COMPUTE[" COMPUTE "]
+        KG["<b>Kaggle Notebook</b><br/>FCNP vs 7 baselines<br/>Real ToolBench G1/G2/G3<br/>GPU + Wilcoxon test"]
+    end
+
+    subgraph PRESENT[" PRESENTATION "]
+        direction TB
+        VC["<b>Vercel Dashboard</b><br/>Next.js · live charts &amp; tables<br/>fcnp-dashboard.vercel.app"]
+        HF["<b>Hugging Face Space</b><br/>Gradio demo · Agri example<br/>hybrid tiering + cost table"]
+    end
+
+    U["<b>Reviewers &amp; Users</b><br/>journal readers, PMs, judges"]
+
+    GH -- "clone + install fcnp" --> KG
+    GH -- "deploy dashboard/" --> VC
+    GH -- "deploy hf_space/" --> HF
+    AGRI -- "data_gov_agri.py" --> HF
+    KG == "POST /api/metrics\n(Bearer token)" ==> VC
+    VC -- "view live results" --> U
+    HF -- "try it live" --> U
+
+    classDef source fill:#0B1F33,stroke:#0B1F33,color:#FFFFFF,stroke-width:2px,rx:8,ry:8
+    classDef compute fill:#2A6F97,stroke:#1B4965,color:#FFFFFF,stroke-width:2px,rx:8,ry:8
+    classDef present fill:#2A9D8F,stroke:#1E6F64,color:#FFFFFF,stroke-width:2px,rx:8,ry:8
+    classDef users fill:#E9C46A,stroke:#B5892E,color:#1D1D1D,stroke-width:2px,rx:8,ry:8
+    classDef agri fill:#5C7A29,stroke:#3A4F1A,color:#FFFFFF,stroke-width:2px,rx:8,ry:8
+    classDef grp fill:#F4F7FA,stroke:#A9C4D8,stroke-width:1.5px,color:#0B1F33,font-weight:bold
+
+    class GH source
+    class KG compute
+    class VC,HF present
+    class U users
+    class AGRI agri
+    class COMPUTE,PRESENT grp
+
+    linkStyle 4 stroke:#E76F51,stroke-width:3px

@@ -1,0 +1,28 @@
+%%{init: {'theme':'base', 'themeVariables': {'fontFamily':'Times New Roman, Georgia, serif', 'fontSize':'15px'}}}%%
+flowchart TD
+    AGRI["data.gov.in API<br/>Mandi/APMC price records<br/>(real, Karnataka-first + national fallback)"]
+    GH["GitHub Repository<br/>fcnp-context-pruning<br/>(source of truth)"]
+    KG["Kaggle Notebook<br/>FCNP + FCNP-Hybrid vs. 7 baselines<br/>ToolBench G1/G2/G3 (real)"]
+    VC["Vercel Dashboard<br/>live metrics API<br/>+ charts / tables"]
+    HF["Hugging Face Space<br/>Gradio demo<br/>Agri example + hybrid tiering + cost table"]
+    US["End Users / Reviewers"]
+
+    AGRI -- "data_gov_agri.py" --> HF
+    GH --> KG
+    GH --> VC
+    GH --> HF
+    KG -- "POST /api/metrics" --> VC
+    VC --> US
+    HF --> US
+
+    classDef src fill:#1F2A44,stroke:#0D1526,color:#FFFFFF,stroke-width:1px
+    classDef data fill:#5C7A29,stroke:#3A4F1A,color:#FFFFFF,stroke-width:1px
+    classDef compute fill:#3D5A80,stroke:#26374F,color:#FFFFFF,stroke-width:1px
+    classDef pres fill:#6D93B8,stroke:#3D5A80,color:#FFFFFF,stroke-width:1px
+    classDef out fill:#C4D7E0,stroke:#6D93B8,color:#1F2A44,stroke-width:1px
+
+    class GH src
+    class AGRI data
+    class KG compute
+    class VC,HF pres
+    class US out

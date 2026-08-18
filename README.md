@@ -20,13 +20,13 @@ FCNP (**Flow-Coupled Network Pruning**) is a context compression algorithm for L
 
 FCNP models the context window as a conductance network: each chunk of retrieved context is a node; query-chunk relevance defines conductance; Kirchhoff flow equations determine which chunks are "on the critical path" to answering the query. Low-flow chunks are pruned.
 
-**Contribution**: FCNP is a **novel application of Physarum/Kirchhoff flow-network dynamics** ([Tero et al. 2010](https://www.science.org/doi/10.1126/science.1177894); [Bonifaci et al. 2012](https://doi.org/10.1016/j.jtbi.2011.10.021)) to LLM context compression — prior compression work (SelectiveContext, LLMLingua) ranks items independently, while FCNP's Kirchhoff formulation makes pruning decisions jointly across the graph. This is a novel *application* of an existing algorithm family, not a novel algorithm; see the Results section below for where the joint formulation currently does and does not pay off empirically.
+**Contribution**: FCNP is a **novel application of Physarum/Kirchhoff flow-network dynamics** ([Tero et al. 2010](https://www.science.org/doi/10.1126/science.1177894); [Bonifaci et al. 2012](https://doi.org/10.1016/j.jtbi.2012.06.017)) to LLM context compression — prior compression work (SelectiveContext, LLMLingua) ranks items independently, while FCNP's Kirchhoff formulation makes pruning decisions jointly across the graph. This is a novel *application* of an existing algorithm family, not a novel algorithm; see the Results section below for where the joint formulation currently does and does not pay off empirically.
 
 ---
 
 ## New in this version: Autonomous Context Management
 
-Five improvements motivated by ["Active Context Compression: Autonomous Memory Management in LLM Agents"](https://arxiv.org/abs/2601.07190) (arXiv:2601.07190, the "Focus" system), applied on top of FCNP's existing flow-based pruning core:
+Five improvements motivated by ["Active Context Compression: Autonomous Memory Management in LLM Agents"](https://arxiv.org/abs/2601.07190) (arXiv:2601.07190, the "Focus" system — **arXiv preprint, not yet peer-reviewed as of Aug 2026**; cited here only as motivating inspiration, see [`docs/NOVELTY_DEFENSE.md`](docs/NOVELTY_DEFENSE.md) for peer-reviewed prior-art positioning of each extension), applied on top of FCNP's existing flow-based pruning core:
 
 | # | Improvement | Module | Idea |
 |---|---|---|---|
@@ -37,6 +37,10 @@ Five improvements motivated by ["Active Context Compression: Autonomous Memory M
 | 5 | Compute-cost vs token-cost quantification | [`fcnp/cost.py`](fcnp/cost.py) | FCNP's cost is a deterministic linear solve — pure wall-clock compute, zero token bill. Focus-style LLM-based compressors instead spend metered tokens on every compression event. `cost_comparison_table()` / `format_markdown_table()` make that difference explicit and auditable (see table below) rather than asserting "FCNP is cheaper" as a slogan. |
 
 [`fcnp/session.py`](fcnp/session.py)'s `AutonomousContextSession` wires all three (#1/#2/#3) into a single orchestrator for long-running agent sessions: `session.observe(new_elements, query_embedding=..., query_text=...)` defers re-pruning until the dynamic trigger fires, then prunes with hybrid tiering and persistent-memory force-inclusion enabled by default.
+
+![FCNP algorithm flow: Kirchhoff/Physarum core loop plus the five autonomous-context extensions](diagrams/obj4_algorithm_flow.png)
+
+*Figure: core Kirchhoff/Physarum solve→flow→update loop, followed by the entropy-based re-pruning trigger (#1), hybrid tiering (#2), persistent memory (#3), and cost accounting (#5) extensions. Source: [`diagrams/obj4_algorithm_flow.mmd`](diagrams/obj4_algorithm_flow.mmd).*
 
 ### Compute-cost vs token-cost (illustrative)
 
@@ -69,12 +73,16 @@ Generate this table live from `fcnp.cost.cost_comparison_table()` / `format_mark
 
 **GitHub Repository**: https://github.com/joyjeni/fcnp-context-pruning
 
-The pipeline has three parts that hand off to each other:
+The pipeline has three parts that hand off to each other, plus a real-time open-government data source feeding the Hugging Face Space's agricultural example:
 
 ```
-Kaggle notebook  --(POST /api/metrics)-->  Vercel dashboard  <--(reads same fcnp package)--  Hugging Face Space
+Kaggle notebook  --(POST /api/metrics)-->  Vercel dashboard  <--(reads same fcnp package)--  Hugging Face Space  <--(data_gov_agri.py)--  data.gov.in Mandi API
 (runs benchmark)      live charts/tables       (public URL)                                (interactive demo)
 ```
+
+![FCNP system architecture: GitHub source of truth deploying to Kaggle, Vercel, and Hugging Face, with data.gov.in mandi price records feeding the Hugging Face Space](diagrams/obj4_architecture.png)
+
+*Figure: end-to-end deployment topology. Source: [`diagrams/obj4_architecture.mmd`](diagrams/obj4_architecture.mmd).*
 
 ### 1. Kaggle notebook (runs the benchmark)
 
@@ -363,8 +371,14 @@ pruned = pruner.compress(context_chunks, query="What is today's tomato price?")
 
 ### Referenced Baselines
 
-- Li et al. *Compressing Context to Enhance Inference Efficiency of Large Language Models*. EMNLP 2023. (SelectiveContext)
-- Jiang et al. *LLMLingua: Compressing Prompts for Accelerated Inference of Large Language Models*. EMNLP 2023. (LLMLingua)
+- Li et al. *Compressing Context to Enhance Inference Efficiency of Large Language Models*. EMNLP 2023. [aclanthology.org/2023.emnlp-main.391](https://aclanthology.org/2023.emnlp-main.391/) (SelectiveContext)
+- Jiang et al. *LLMLingua: Compressing Prompts for Accelerated Inference of Large Language Models*. EMNLP 2023. [aclanthology.org/2023.emnlp-main.825](https://aclanthology.org/2023.emnlp-main.825/) (LLMLingua)
+- Jiang et al. *LongLLMLingua: Accelerating and Enhancing LLMs in Long Context Scenarios via Prompt Compression*. ACL 2024. [arxiv.org/abs/2310.06839](https://arxiv.org/abs/2310.06839)
+- Robertson, S., Zaragoza, H. *The Probabilistic Relevance Framework: BM25 and Beyond*. Foundations and Trends in Information Retrieval 3(4), 2009. DOI [10.1561/1500000019](https://dl.acm.org/doi/10.1561/1500000019)
+
+### PhD defense literature grounding
+
+For the base-paper positioning and a per-contribution novelty verdict (what is prior art vs. what is a novel combination vs. what is genuinely unclaimed), with every citation checked against a live, verifiable source, see **[`docs/NOVELTY_DEFENSE.md`](docs/NOVELTY_DEFENSE.md)**.
 
 ---
 
