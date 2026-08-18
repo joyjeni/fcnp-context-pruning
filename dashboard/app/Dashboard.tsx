@@ -181,6 +181,9 @@ export default function Dashboard({ metrics }: { metrics: MetricsPayload | null 
       </div>
 
       <h2>Pareto frontier — accuracy vs compression</h2>
+      <p className="sublabel" style={{ marginTop: -6, marginBottom: 10 }}>
+        Methods with identical (compression, F1) values plot as overlapping markers — labels are fanned out around them so every method stays readable.
+      </p>
       <div className="chart-card">
         <ResponsiveContainer width="100%" height={340}>
           <ScatterChart margin={{ top: 34, right: 48, bottom: 36, left: 8 }}>
@@ -205,9 +208,10 @@ export default function Dashboard({ metrics }: { metrics: MetricsPayload | null 
               <LabelList
                 dataKey="method"
                 content={(props: any) => {
-                  const { x, y, value, payload } = props;
-                  const dx = payload?.labelDx ?? 0;
-                  const dy = payload?.labelDy ?? -10;
+                  const { x, y, value, index } = props;
+                  const off = pareto[index] ?? { labelDx: 0, labelDy: -10 };
+                  const dx = off.labelDx ?? 0;
+                  const dy = off.labelDy ?? -10;
                   return (
                     <text x={x + dx} y={y + dy} fill="#c9d1d9" fontSize={11} textAnchor="middle">
                       {value}
