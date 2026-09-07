@@ -12,6 +12,10 @@ license: mit
 
 # FCNP — Flow-Based Context Network Pruning (interactive demo)
 
+> ACRS Objective 4 demo. Tero et al. (Science, 2010) is the biological
+> citation. Compression ratios shown in the Space are not proposal commitments.
+> Live agriculture examples must use `data.gov.in`; never snapshot prices as truth.
+
 Live demo of **Flow-Based Context Network Pruning (FCNP)**, a Physarum/slime-mould-inspired
 ([Tero et al. 2010](https://www.science.org/doi/10.1126/science.1177894),
 [Bonifaci et al. 2012](https://doi.org/10.1016/j.jtbi.2011.10.021)) graph-flow method for

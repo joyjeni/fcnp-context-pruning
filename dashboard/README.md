@@ -1,5 +1,8 @@
 # FCNP Dashboard
 
+> ACRS Objective 4 companion UI. Charts here are laboratory traces, **not**
+> metric commitments of the Ph.D. proposal.
+
 Next.js app that visualizes FCNP benchmark metrics produced by the
 Kaggle notebook.
 

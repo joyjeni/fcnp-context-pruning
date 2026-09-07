@@ -1,5 +1,8 @@
 # FCNP HTTP microservice
 
+> ACRS Objective 4. Kirchhoff/Physarum prune with citation pin. Proposal-stage:
+> no token-ratio commitment. `POST /agri/snapshot` never invents prices.
+
 ```bash
 python service/app.py 43134
 curl -X POST http://127.0.0.1:43134/prune -H 'Content-Type: application/json' \

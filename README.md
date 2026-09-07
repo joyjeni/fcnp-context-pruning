@@ -1,13 +1,27 @@
-# FCNP — Flow-Coupled Network Pruning
+# FCNP — Flow-Coupled Network Pruning (ACRS Objective 4)
 
-> **PhD Objective 4** | Kirchhoff/Physarum-Analog Context Compression for LLM Agents
+> **Ph.D. CSE, M S Ramaiah University of Applied Sciences (FET).**  
+> Scholar: Jenisha T (`24ETRP720001`). Supervisor: Dr. Jyothi A P.  
+> Integrated loop: SATR → APRR → MNCD → **FCNP** (write-back into SATR).
 
-[![GitHub](https://img.shields.io/badge/GitHub-Public-black)](https://github.com/joyjeni/fcnp-context-pruning)
-[![Vercel](https://img.shields.io/badge/Vercel-Dashboard-brightgreen)](https://fcnp-context-pruning.vercel.app)
-[![Kaggle](https://img.shields.io/badge/Kaggle-Benchmark-blue)](https://www.kaggle.com)
-[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
+This repository is the **memory chapter** of ACRS. Remaining context is treated as
+a flow network in the spirit of Kirchhoff’s laws and Tero et al., *Rules for
+Biologically Inspired Adaptive Network Design*, **Science, 2010**,
+doi:10.1126/science.1177894. Low-flow spans are pruned; surviving **live
+citations** are written back into SATR.
 
-**GitHub**: https://github.com/joyjeni/fcnp-context-pruning (PUBLIC — previously private, now open)
+**Proposal-stage stance:** compression ratios, F1, nDCG, millisecond speedups, and
+dollar token-cost tables in this repository are **laboratory traces**, not
+commitments of the research proposal. The unit of publication is the
+**coupling** (prune + write-back), not a token-percentage.
+
+## SOTA this chapter is written against
+
+- Jiang et al., LLMLingua, **EMNLP 2023** — token-importance compression, no retrieval write-back.
+- Park et al., Generative Agents, **CHI 2023** — language memory in a sandbox.
+
+**Gap (G4).** Compressors do not pin a `data.gov.in` UUID + `modal_price` into the
+next SATR prior.
 
 ---
 
