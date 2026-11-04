@@ -1,8 +1,11 @@
 # FCNP — Flow-Coupled Network Pruning (ACRS Objective 4)
 
 > **Ph.D. CSE, M S Ramaiah University of Applied Sciences (FET).**  
-> Scholar: Jenisha T (`24ETRP720001`). Supervisor: Dr. Jyothi A P.  
+> Scholar: Jenisha T (`24ETRP720001`). Supervisor: Dr. Padma Priya Darshini P.  
 > Integrated loop: SATR → APRR → MNCD → **FCNP** (write-back into SATR).
+
+
+> **Postdoctoral review (November 2026) — read first.** 2 critical issue(s) affect the results reported below; see [`docs/POSTDOC_REVIEW.md`](docs/POSTDOC_REVIEW.md) before citing any number from this repository.
 
 This repository is the **memory chapter** of ACRS. Remaining context is treated as
 a flow network in the spirit of Kirchhoff’s laws and Tero et al., *Rules for
